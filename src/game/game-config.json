@@ -1,5 +1,11 @@
 {
   "version": 1,
+  "dayRollover": {
+    "startHour": 3
+  },
+  "dayClose": {
+    "maxBackfillDays": 30
+  },
   "levels": {
     "base": 50,
     "coefficient": 6,

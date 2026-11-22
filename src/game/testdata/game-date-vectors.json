@@ -1,0 +1,142 @@
+[
+  {
+    "note": "before the rollover hour, still the previous game day",
+    "instant": "2026-01-15T00:30:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 3,
+    "expected": "2026-01-14"
+  },
+  {
+    "note": "exactly on the rollover hour, the new game day starts",
+    "instant": "2026-01-15T02:00:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 3,
+    "expected": "2026-01-15"
+  },
+  {
+    "note": "one second before the rollover",
+    "instant": "2026-01-15T01:59:59Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 3,
+    "expected": "2026-01-14"
+  },
+  {
+    "note": "local midnight belongs to the day before",
+    "instant": "2026-01-14T23:00:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 3,
+    "expected": "2026-01-14"
+  },
+  {
+    "note": "late evening is the same game day",
+    "instant": "2026-01-15T22:00:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 3,
+    "expected": "2026-01-15"
+  },
+  {
+    "note": "DST spring forward, before the jump",
+    "instant": "2026-03-29T00:30:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 3,
+    "expected": "2026-03-28"
+  },
+  {
+    "note": "DST spring forward, after the jump the clock is already past 03:00",
+    "instant": "2026-03-29T01:30:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 3,
+    "expected": "2026-03-29"
+  },
+  {
+    "note": "DST fall back, first pass through 02:30",
+    "instant": "2026-10-25T00:30:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 3,
+    "expected": "2026-10-24"
+  },
+  {
+    "note": "DST fall back, repeated 02:30 maps to the same game day",
+    "instant": "2026-10-25T01:30:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 3,
+    "expected": "2026-10-24"
+  },
+  {
+    "note": "DST fall back, past the rollover",
+    "instant": "2026-10-25T02:30:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 3,
+    "expected": "2026-10-25"
+  },
+  {
+    "note": "western timezone before rollover",
+    "instant": "2026-01-15T10:00:00Z",
+    "timeZone": "America/Los_Angeles",
+    "startHour": 3,
+    "expected": "2026-01-14"
+  },
+  {
+    "note": "western timezone on rollover",
+    "instant": "2026-01-15T11:00:00Z",
+    "timeZone": "America/Los_Angeles",
+    "startHour": 3,
+    "expected": "2026-01-15"
+  },
+  {
+    "note": "far eastern timezone, already tomorrow locally but before rollover",
+    "instant": "2026-01-15T13:00:00Z",
+    "timeZone": "Pacific/Auckland",
+    "startHour": 3,
+    "expected": "2026-01-15"
+  },
+  {
+    "note": "far eastern timezone on rollover",
+    "instant": "2026-01-15T14:00:00Z",
+    "timeZone": "Pacific/Auckland",
+    "startHour": 3,
+    "expected": "2026-01-16"
+  },
+  {
+    "note": "UTC just before rollover",
+    "instant": "2026-06-01T02:59:00Z",
+    "timeZone": "UTC",
+    "startHour": 3,
+    "expected": "2026-05-31"
+  },
+  {
+    "note": "UTC on rollover",
+    "instant": "2026-06-01T03:00:00Z",
+    "timeZone": "UTC",
+    "startHour": 3,
+    "expected": "2026-06-01"
+  },
+  {
+    "note": "startHour 0 means the game day is the calendar day",
+    "instant": "2026-01-15T00:30:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 0,
+    "expected": "2026-01-15"
+  },
+  {
+    "note": "startHour 0 at local midnight",
+    "instant": "2026-01-14T23:00:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 0,
+    "expected": "2026-01-15"
+  },
+  {
+    "note": "a late rollover hour pushes most of the day backwards",
+    "instant": "2026-01-15T20:00:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 23,
+    "expected": "2026-01-14"
+  },
+  {
+    "note": "year boundary before rollover",
+    "instant": "2027-01-01T01:00:00Z",
+    "timeZone": "Europe/Berlin",
+    "startHour": 3,
+    "expected": "2026-12-31"
+  }
+]

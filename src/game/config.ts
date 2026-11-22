@@ -26,6 +26,14 @@ const nonNegativeInt = z.number().int().nonnegative();
 
 const gameConfigSchema = z.object({
   version: positiveInt,
+  dayRollover: z.object({
+    /** A game day starts at this wall-clock hour in the hunter timezone (C5). */
+    startHour: z.number().int().min(0).max(23),
+  }),
+  dayClose: z.object({
+    /** Most game days close_days() will process in a single call (G8). */
+    maxBackfillDays: positiveInt,
+  }),
   levels: z.object({
     base: nonNegativeInt,
     coefficient: z.number().positive(),
@@ -85,5 +93,8 @@ export function sqlConfigSlice(config: GameConfig = GAME_CONFIG) {
     daily_caps: config.dailyCaps,
     stat_xp_divisor: config.rewards.statXpDivisor,
     min_stat_xp_per_tag: config.rewards.minStatXpPerTag,
+    game_day_start_hour: config.dayRollover.startHour,
+    free_points_per_daily_clear: config.freePoints.perDailyClear,
+    close_days_max_backfill: config.dayClose.maxBackfillDays,
   };
 }

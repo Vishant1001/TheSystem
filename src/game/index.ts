@@ -21,6 +21,8 @@ export {
   type LevelProgress,
 } from './levels';
 
+export { gameDateAt, gameToday } from './gameDate';
+
 export {
   statXpToNext,
   totalStatXpForValue,

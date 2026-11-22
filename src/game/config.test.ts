@@ -17,6 +17,14 @@ describe('game config', () => {
     });
   });
 
+  it('holds the day rollover hour (C5)', () => {
+    expect(GAME_CONFIG.dayRollover).toEqual({ startHour: 3 });
+  });
+
+  it('holds the day close backfill cap (G8)', () => {
+    expect(GAME_CONFIG.dayClose).toEqual({ maxBackfillDays: 30 });
+  });
+
   it('holds the rank bands (5.2)', () => {
     expect(GAME_CONFIG.ranks).toEqual([
       { rank: 'E', minLevel: 1 },
@@ -73,6 +81,9 @@ describe('sqlConfigSlice', () => {
       daily_caps: { fitness: 150, diet: 100, life: 150 },
       stat_xp_divisor: 2,
       min_stat_xp_per_tag: 1,
+      game_day_start_hour: 3,
+      free_points_per_daily_clear: 1,
+      close_days_max_backfill: 30,
     });
   });
 });
