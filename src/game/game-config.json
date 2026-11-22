@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "levels": {
+    "base": 50,
+    "coefficient": 6,
+    "exponent": 1.7,
+    "roundTo": 10,
+    "startLevel": 1,
+    "maxLevel": 999
+  },
+  "ranks": [
+    { "rank": "E", "minLevel": 1 },
+    { "rank": "D", "minLevel": 10 },
+    { "rank": "C", "minLevel": 20 },
+    { "rank": "B", "minLevel": 30 },
+    { "rank": "A", "minLevel": 45 },
+    { "rank": "S", "minLevel": 60 }
+  ],
+  "stats": {
+    "ids": ["STR", "AGI", "VIT", "INT", "SENSE"],
+    "startValue": 10,
+    "xpBase": 30,
+    "xpPerPoint": 3
+  },
+  "freePoints": {
+    "perLevel": 3,
+    "perDailyClear": 1
+  },
+  "rewards": {
+    "xpByDifficulty": { "E": 10, "D": 20, "C": 35, "B": 50, "A": 75, "S": 100 },
+    "statXpDivisor": 2,
+    "minStatXpPerTag": 1,
+    "maxStatTags": 2
+  },
+  "dailyCaps": { "fitness": 150, "diet": 100, "life": 150 }
+}
