@@ -1,6 +1,7 @@
 /**
  * Every string the System says lives here (brief 7.3) so wording can be tuned
- * in one place. Later steps add quest, XP, level-up and report lines.
+ * in one place. Errors are mapped from the stable tokens the RPCs raise - the
+ * hunter never sees a raw exception.
  */
 export const systemCopy = {
   app: {
@@ -21,7 +22,57 @@ export const systemCopy = {
     access: 'HUNTER ACCESS',
     registration: 'HUNTER REGISTRATION',
     questDesigner: 'QUEST DESIGNER',
+    settings: 'HUNTER SETTINGS',
     unknownGate: 'UNKNOWN GATE',
+  },
+  auth: {
+    prompt: 'Identify yourself, hunter.',
+    email: 'Email',
+    password: 'Password',
+    signIn: 'Enter',
+    signUp: 'Awaken',
+    signOut: 'Sign out',
+    toSignUp: 'No record? Awaken as a new hunter.',
+    toSignIn: 'Already awakened? Sign in.',
+    working: 'The System is verifying you.',
+    checkInbox: 'The System sent a confirmation link. Confirm it, then sign in.',
+  },
+  onboarding: {
+    prompt: 'The System is preparing your record.',
+    nameLabel: 'Hunter name',
+    namePlaceholder: 'Name yourself',
+    timezoneLabel: 'Timezone',
+    timezoneHint: 'A game day runs from 03:00 to 03:00 in this timezone.',
+    kcalLabel: 'Daily calorie range',
+    kcalMin: 'Lower',
+    kcalMax: 'Upper',
+    proteinLabel: 'Daily protein target',
+    proteinUnit: 'g',
+    submit: 'Begin',
+    working: 'The System is registering you.',
+    seeded: 'Four daily quests have been assigned.',
+  },
+  settings: {
+    open: 'Settings',
+    prompt: 'Adjust your record, hunter.',
+    save: 'Save',
+    working: 'The System is updating your record.',
+    saved: 'Record updated.',
+    effective: 'Diet targets take effect from the next game day. Sealed days are never re-judged.',
+    inForceToday: 'IN FORCE TODAY',
+    pendingChange: 'Your new targets are waiting for the next game day.',
+  },
+  status: {
+    level: 'Level',
+    rank: 'Rank',
+    xp: 'XP',
+    toNext: 'to next level',
+    maxLevel: 'Maximum level reached',
+    stats: 'Stats',
+    freePoints: 'Free points',
+    noFreePoints: 'No points to allocate.',
+    todayXp: 'Today',
+    cap: 'cap',
   },
   empty: {
     status: 'No hunter record is linked to this session.',
@@ -32,18 +83,11 @@ export const systemCopy = {
     report: 'No closed days to report.',
   },
   pending: {
-    access: 'Hunter access activates when the authentication module is installed.',
-    registration: 'Registration activates with the authentication module.',
     questDesigner: 'The quest designer activates with the quest module.',
   },
   states: {
     loading: 'The System is retrieving your records.',
     offline: 'Connection to the System lost. Showing the last known state.',
-  },
-  errors: {
-    generic: 'The System could not complete that action.',
-    load: 'The System could not retrieve your records.',
-    notFound: 'This gate does not exist.',
   },
   actions: {
     addQuest: 'Add quest',
@@ -55,5 +99,42 @@ export const systemCopy = {
   tabs: {
     food: 'Food',
     workout: 'Workout',
+  },
+  errors: {
+    generic: 'The System could not complete that action.',
+    load: 'The System could not retrieve your records.',
+    notFound: 'This gate does not exist.',
+    offline: 'The System is unreachable. Check your connection.',
+  },
+  /** Keyed by the token an RPC raises (see supabase/README.md). */
+  errorsByToken: {
+    AUTH_REQUIRED: 'Your session has expired. Sign in again.',
+    HUNTER_NOT_FOUND: 'No hunter record found for this session.',
+    ALREADY_ONBOARDED: 'This account already has a hunter record.',
+    INVALID_TIMEZONE: 'The System does not recognise that timezone.',
+    INVALID_KCAL_RANGE: 'That calorie range is not valid.',
+    QUEST_NOT_FOUND: 'That quest is not in your log.',
+    QUEST_ARCHIVED: 'That quest has been archived.',
+    QUEST_IS_AUTO: 'The System tracks this quest for you.',
+    QUEST_NOT_SCHEDULED_TODAY: 'That quest is not scheduled for today.',
+    QUEST_NOT_DUE_YET: 'That quest cannot be completed yet.',
+    ALREADY_COMPLETED: 'That quest is already complete.',
+    VALUE_REQUIRED: 'Enter a value to complete this quest.',
+    GOAL_NOT_MET: 'The goal has not been met.',
+    COMPLETION_NOT_FOUND: 'There is nothing to undo.',
+    SEALED_DAY: 'That day is sealed. The System does not alter it.',
+    ENTRY_NOT_FOUND: 'That entry is no longer in your log.',
+    WORKOUT_NOT_FOUND: 'That workout is no longer in your log.',
+    INVALID_SETS: 'Those sets are not valid.',
+    POINTS_MUST_BE_POSITIVE: 'Allocate at least one point.',
+    UNKNOWN_STAT_TAG: 'That is not a known stat.',
+  } as Record<string, string>,
+  /** Supabase Auth failures, which arrive as messages rather than tokens. */
+  authErrors: {
+    invalidCredentials: 'Those credentials do not match any hunter.',
+    userExists: 'A hunter already exists for that email.',
+    weakPassword: 'That password is too weak.',
+    emailNotConfirmed: 'Confirm your email address first.',
+    rateLimited: 'Too many attempts. Wait a moment.',
   },
 } as const;

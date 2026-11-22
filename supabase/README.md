@@ -117,7 +117,7 @@ public`, asserts `auth.uid()` and scopes every statement to that uid. A
 
 > **Writing a new function?** Supabase's default privileges grant `EXECUTE` on
 > every new function in `public` to `anon` and `authenticated` **by name**, so
-> `revoke ... from public` does *not* take it away. Always revoke from
+> `revoke ... from public` does _not_ take it away. Always revoke from
 > `public, anon, authenticated` and then grant back only what the client needs.
 > `rls_proof.sql` checks every helper and will fail if one is left reachable.
 

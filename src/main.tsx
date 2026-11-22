@@ -12,6 +12,7 @@ import '@fontsource/inter/latin-600.css';
 
 import './styles/app.css';
 import { App } from './App';
+import { AuthProvider } from './features/auth/AuthProvider';
 import { queryClient } from './lib/queryClient';
 
 const rootElement = document.getElementById('root');
@@ -22,7 +23,9 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </QueryClientProvider>
   </StrictMode>,
 );
