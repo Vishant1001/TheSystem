@@ -1,0 +1,10 @@
+dist
+dev-dist
+coverage
+node_modules
+package-lock.json
+public/*.png
+public/*.ico
+
+# the build brief is the architect's document, not ours to reformat
+phase-1-prompt.md

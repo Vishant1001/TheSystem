@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="THE SYSTEM">
+  <!-- System window panel -->
+  <rect x="40" y="40" width="432" height="432" rx="56" fill="#05070D" />
+  <rect x="40" y="40" width="432" height="432" rx="56" fill="none" stroke="#2E8BFF" stroke-width="12" />
+  <rect x="66" y="66" width="380" height="380" rx="38" fill="none" stroke="#7FD8FF" stroke-width="4" opacity="0.55" />
+
+  <!-- Corner brackets -->
+  <g stroke="#7FD8FF" stroke-width="14" stroke-linecap="square" fill="none">
+    <path d="M106 150 V116 H140" />
+    <path d="M406 150 V116 H372" />
+    <path d="M106 362 V396 H140" />
+    <path d="M406 362 V396 H372" />
+  </g>
+
+  <!-- Level-up chevrons (glow emulated with a wider translucent stroke, no SVG filters) -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M166 300 L256 212 L346 300" stroke="#2E8BFF" stroke-width="64" opacity="0.3" />
+    <path d="M166 300 L256 212 L346 300" stroke="#7FD8FF" stroke-width="34" />
+    <path d="M186 372 L256 304 L326 372" stroke="#2E8BFF" stroke-width="46" opacity="0.28" />
+    <path d="M186 372 L256 304 L326 372" stroke="#2E8BFF" stroke-width="24" />
+  </g>
+</svg>

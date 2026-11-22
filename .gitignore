@@ -1,0 +1,31 @@
+# dependencies
+node_modules
+
+# build output
+dist
+dev-dist
+coverage
+*.tsbuildinfo
+
+# environment: never commit real keys
+.env
+.env.*
+!.env.example
+
+# supabase local state
+supabase/.temp
+supabase/.branches
+
+# editors / OS
+.DS_Store
+Thumbs.db
+.idea
+*.local
+
+# logs
+npm-debug.log*
+logs
+*.log
+
+# local, machine-specific Claude Code settings
+.claude/settings.local.json
