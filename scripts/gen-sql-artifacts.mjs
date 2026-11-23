@@ -4,7 +4,11 @@
  * game number, and src/game/testdata/game-date-vectors.json for the day
  * rollover. Both SQL artifacts below are generated from those files:
  *
- *   supabase/migrations/20261122000300_game_config.sql   seed for game_config
+ *   supabase/migrations/20261123000100_game_config_v2.sql seed for game_config
+ *
+ * 20261122000300_game_config.sql is the Phase 1 seed. It is already applied
+ * on the hosted project, so it is frozen history: migrations are forward-only,
+ * and the newest config migration re-seeds every key with an upsert.
  *   supabase/tests/game_date_parity.sql                  engine/SQL parity (C5)
  *
  * Regenerate with:  npm run gen:sql
@@ -17,7 +21,9 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-export const CONFIG_MIGRATION_PATH = 'supabase/migrations/20261122000300_game_config.sql';
+export const CONFIG_MIGRATION_PATH = 'supabase/migrations/20261123000100_game_config_v2.sql';
+/** Frozen: applied on hosted in Phase 1. Never regenerated. */
+export const PHASE1_CONFIG_MIGRATION_PATH = 'supabase/migrations/20261122000300_game_config.sql';
 export const PARITY_TEST_PATH = 'supabase/tests/game_date_parity.sql';
 export const SCHEDULE_PARITY_TEST_PATH = 'supabase/tests/quest_schedule_parity.sql';
 
@@ -39,17 +45,28 @@ export function sqlConfigRows(config) {
     ['min_stat_xp_per_tag', config.rewards.minStatXpPerTag],
     ['free_points_per_daily_clear', config.freePoints.perDailyClear],
     ['close_days_max_backfill', config.dayClose.maxBackfillDays],
+    ['level_curve', config.levels],
+    ['stat_order', config.stats.ids],
+    ['award_sources', config.awardSources],
+    ['penalty', config.penalty],
+    ['stones', config.stones],
+    ['safe_zones', config.safeZones],
+    ['gym', config.gym],
   ];
 }
 
 export function buildGameConfigMigration(config) {
   const values = sqlConfigRows(config)
-    .map(([key, value]) => `  ('${key}', '${JSON.stringify(value)}'::jsonb)`)
+    .map(([key, value]) => `  ('${key}', '${JSON.stringify(value).replaceAll("'", "''")}'::jsonb)`)
     .join(',\n');
 
   return `${GENERATED_HEADER}
--- Seed of public.game_config (ADR-4). SQL owns awards and caps; the TypeScript
--- engine owns the curves. Both read these same numbers.
+-- Seed of public.game_config (ADR-4, amended in Phase 2). SQL owns awards and
+-- caps; TypeScript is the reference for the curves, which SQL may read (the
+-- level curve sizes XP Debt). Both read these same numbers.
+--
+-- Forward-only: this re-seeds every key with an upsert, so it supersedes the
+-- Phase 1 seed (20261122000300_game_config.sql) without editing it.
 
 insert into public.game_config (key, value)
 values

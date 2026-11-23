@@ -1,0 +1,228 @@
+[
+  {
+    "note": "normal day, both core quests done",
+    "day": "2026-12-07",
+    "phase2Rules": true,
+    "restDays": [6, 7],
+    "safe": false,
+    "quests": [
+      { "isCore": true, "onRestDays": false, "scheduled": true, "done": true },
+      { "isCore": true, "onRestDays": false, "scheduled": true, "done": true }
+    ],
+    "expected": {
+      "status": "cleared",
+      "coreTotal": 2,
+      "coreDone": 2,
+      "freePoints": 1,
+      "createsPenalty": false,
+      "streak": "extend"
+    }
+  },
+  {
+    "note": "normal day, one core quest missed",
+    "day": "2026-12-07",
+    "phase2Rules": true,
+    "restDays": [6, 7],
+    "safe": false,
+    "quests": [
+      { "isCore": true, "onRestDays": false, "scheduled": true, "done": true },
+      { "isCore": true, "onRestDays": false, "scheduled": true, "done": false }
+    ],
+    "expected": {
+      "status": "failed",
+      "coreTotal": 2,
+      "coreDone": 1,
+      "freePoints": 0,
+      "createsPenalty": true,
+      "streak": "reset"
+    }
+  },
+  {
+    "note": "normal day with no core quests (G6): cleared, neutral, no point",
+    "day": "2026-12-07",
+    "phase2Rules": true,
+    "restDays": [],
+    "safe": false,
+    "quests": [{ "isCore": false, "onRestDays": false, "scheduled": true, "done": false }],
+    "expected": {
+      "status": "cleared",
+      "coreTotal": 0,
+      "coreDone": 0,
+      "freePoints": 0,
+      "createsPenalty": false,
+      "streak": "neutral"
+    }
+  },
+  {
+    "note": "rest day (Saturday) with no rest-day quests: rest, never a penalty",
+    "day": "2026-12-12",
+    "phase2Rules": true,
+    "restDays": [6, 7],
+    "safe": false,
+    "quests": [{ "isCore": true, "onRestDays": false, "scheduled": true, "done": false }],
+    "expected": {
+      "status": "rest",
+      "coreTotal": 0,
+      "coreDone": 0,
+      "freePoints": 0,
+      "createsPenalty": false,
+      "streak": "neutral"
+    }
+  },
+  {
+    "note": "rest day (Sunday) with its rest-day quest done: cleared and a point",
+    "day": "2026-12-13",
+    "phase2Rules": true,
+    "restDays": [6, 7],
+    "safe": false,
+    "quests": [
+      { "isCore": true, "onRestDays": true, "scheduled": true, "done": true },
+      { "isCore": true, "onRestDays": false, "scheduled": true, "done": false }
+    ],
+    "expected": {
+      "status": "cleared",
+      "coreTotal": 1,
+      "coreDone": 1,
+      "freePoints": 1,
+      "createsPenalty": false,
+      "streak": "extend"
+    }
+  },
+  {
+    "note": "rest day with its rest-day quest missed: still rest",
+    "day": "2026-12-13",
+    "phase2Rules": true,
+    "restDays": [7],
+    "safe": false,
+    "quests": [{ "isCore": true, "onRestDays": true, "scheduled": true, "done": false }],
+    "expected": {
+      "status": "rest",
+      "coreTotal": 1,
+      "coreDone": 0,
+      "freePoints": 0,
+      "createsPenalty": false,
+      "streak": "neutral"
+    }
+  },
+  {
+    "note": "a Monday is not a weekend rest day",
+    "day": "2026-12-07",
+    "phase2Rules": true,
+    "restDays": [6, 7],
+    "safe": false,
+    "quests": [{ "isCore": true, "onRestDays": true, "scheduled": true, "done": false }],
+    "expected": {
+      "status": "failed",
+      "coreTotal": 1,
+      "coreDone": 0,
+      "freePoints": 0,
+      "createsPenalty": true,
+      "streak": "reset"
+    }
+  },
+  {
+    "note": "safe day with everything missed",
+    "day": "2026-12-07",
+    "phase2Rules": true,
+    "restDays": [],
+    "safe": true,
+    "quests": [
+      { "isCore": true, "onRestDays": false, "scheduled": true, "done": false },
+      { "isCore": true, "onRestDays": false, "scheduled": true, "done": false }
+    ],
+    "expected": {
+      "status": "safe",
+      "coreTotal": 2,
+      "coreDone": 0,
+      "freePoints": 0,
+      "createsPenalty": false,
+      "streak": "neutral"
+    }
+  },
+  {
+    "note": "safe beats rest on the same day",
+    "day": "2026-12-12",
+    "phase2Rules": true,
+    "restDays": [6],
+    "safe": true,
+    "quests": [{ "isCore": true, "onRestDays": true, "scheduled": true, "done": true }],
+    "expected": {
+      "status": "safe",
+      "coreTotal": 1,
+      "coreDone": 1,
+      "freePoints": 0,
+      "createsPenalty": false,
+      "streak": "neutral"
+    }
+  },
+  {
+    "note": "safe day with everything done: still safe, no point",
+    "day": "2026-12-08",
+    "phase2Rules": true,
+    "restDays": [],
+    "safe": true,
+    "quests": [{ "isCore": true, "onRestDays": false, "scheduled": true, "done": true }],
+    "expected": {
+      "status": "safe",
+      "coreTotal": 1,
+      "coreDone": 1,
+      "freePoints": 0,
+      "createsPenalty": false,
+      "streak": "neutral"
+    }
+  },
+  {
+    "note": "before the rules epoch a failed day stays Phase 1: no penalty, rest and safe ignored",
+    "day": "2026-12-12",
+    "phase2Rules": false,
+    "restDays": [6],
+    "safe": true,
+    "quests": [
+      { "isCore": true, "onRestDays": false, "scheduled": true, "done": false },
+      { "isCore": true, "onRestDays": false, "scheduled": true, "done": true }
+    ],
+    "expected": {
+      "status": "failed",
+      "coreTotal": 2,
+      "coreDone": 1,
+      "freePoints": 0,
+      "createsPenalty": false,
+      "streak": "neutral"
+    }
+  },
+  {
+    "note": "before the rules epoch a cleared day pays its point but leaves the streak alone",
+    "day": "2026-12-07",
+    "phase2Rules": false,
+    "restDays": [],
+    "safe": false,
+    "quests": [{ "isCore": true, "onRestDays": false, "scheduled": true, "done": true }],
+    "expected": {
+      "status": "cleared",
+      "coreTotal": 1,
+      "coreDone": 1,
+      "freePoints": 1,
+      "createsPenalty": false,
+      "streak": "neutral"
+    }
+  },
+  {
+    "note": "an unscheduled core quest is not tallied",
+    "day": "2026-12-07",
+    "phase2Rules": true,
+    "restDays": [],
+    "safe": false,
+    "quests": [
+      { "isCore": true, "onRestDays": false, "scheduled": false, "done": false },
+      { "isCore": true, "onRestDays": false, "scheduled": true, "done": true }
+    ],
+    "expected": {
+      "status": "cleared",
+      "coreTotal": 1,
+      "coreDone": 1,
+      "freePoints": 1,
+      "createsPenalty": false,
+      "streak": "extend"
+    }
+  }
+]

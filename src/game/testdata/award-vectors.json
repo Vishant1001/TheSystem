@@ -1,0 +1,227 @@
+[
+  {
+    "note": "quest, uncapped, no modifiers: remainder to the first tag (G1)",
+    "input": {
+      "source": "quest",
+      "fullXp": 35,
+      "capRoom": 150,
+      "stats": [
+        { "stat": "STR", "weight": 1 },
+        { "stat": "VIT", "weight": 1 }
+      ],
+      "weakenedStat": null,
+      "debtRemaining": 0
+    },
+    "expected": {
+      "xp": 35,
+      "capped": false,
+      "statXp": { "STR": 9, "VIT": 8 },
+      "weakened": false,
+      "repayment": 0
+    }
+  },
+  {
+    "note": "quest, capped: stat XP scaled by the cap ratio, no minimum (G2)",
+    "input": {
+      "source": "quest",
+      "fullXp": 35,
+      "capRoom": 20,
+      "stats": [
+        { "stat": "STR", "weight": 1 },
+        { "stat": "VIT", "weight": 1 }
+      ],
+      "weakenedStat": null,
+      "debtRemaining": 0
+    },
+    "expected": {
+      "xp": 20,
+      "capped": true,
+      "statXp": { "STR": 5, "VIT": 4 },
+      "weakened": false,
+      "repayment": 0
+    }
+  },
+  {
+    "note": "quest with Weakened on its only tag and debt open",
+    "input": {
+      "source": "quest",
+      "fullXp": 50,
+      "capRoom": 150,
+      "stats": [{ "stat": "VIT", "weight": 1 }],
+      "weakenedStat": "VIT",
+      "debtRemaining": 100
+    },
+    "expected": { "xp": 50, "capped": false, "statXp": {}, "weakened": true, "repayment": 25 }
+  },
+  {
+    "note": "quest repays only what is left",
+    "input": {
+      "source": "quest",
+      "fullXp": 10,
+      "capRoom": 150,
+      "stats": [
+        { "stat": "INT", "weight": 1 },
+        { "stat": "SENSE", "weight": 1 }
+      ],
+      "weakenedStat": null,
+      "debtRemaining": 3
+    },
+    "expected": {
+      "xp": 10,
+      "capped": false,
+      "statXp": { "INT": 3, "SENSE": 2 },
+      "weakened": false,
+      "repayment": 3
+    }
+  },
+  {
+    "note": "quest with no cap room left: a 0 XP event, nothing repaid",
+    "input": {
+      "source": "quest",
+      "fullXp": 20,
+      "capRoom": 0,
+      "stats": [{ "stat": "AGI", "weight": 1 }],
+      "weakenedStat": null,
+      "debtRemaining": 50
+    },
+    "expected": { "xp": 0, "capped": true, "statXp": {}, "weakened": false, "repayment": 0 }
+  },
+  {
+    "note": "workout, capped, two stats weighted by sets, debt open",
+    "input": {
+      "source": "workout",
+      "fullXp": 16,
+      "capRoom": 10,
+      "stats": [
+        { "stat": "STR", "weight": 6 },
+        { "stat": "AGI", "weight": 2 }
+      ],
+      "weakenedStat": null,
+      "debtRemaining": 100
+    },
+    "expected": {
+      "xp": 10,
+      "capped": true,
+      "statXp": { "STR": 4, "AGI": 1 },
+      "weakened": false,
+      "repayment": 5
+    }
+  },
+  {
+    "note": "workout with Weakened on a stat it does not feed",
+    "input": {
+      "source": "workout",
+      "fullXp": 6,
+      "capRoom": 150,
+      "stats": [{ "stat": "VIT", "weight": 3 }],
+      "weakenedStat": "STR",
+      "debtRemaining": 0
+    },
+    "expected": {
+      "xp": 6,
+      "capped": false,
+      "statXp": { "VIT": 3 },
+      "weakened": false,
+      "repayment": 0
+    }
+  },
+  {
+    "note": "PR bonus ignores the cap and repays debt",
+    "input": {
+      "source": "pr",
+      "fullXp": 25,
+      "capRoom": 0,
+      "stats": [{ "stat": "STR", "weight": 1 }],
+      "weakenedStat": null,
+      "debtRemaining": 7
+    },
+    "expected": {
+      "xp": 25,
+      "capped": false,
+      "statXp": { "STR": 10 },
+      "weakened": false,
+      "repayment": 7
+    }
+  },
+  {
+    "note": "PR bonus under Weakened STR",
+    "input": {
+      "source": "pr",
+      "fullXp": 25,
+      "capRoom": 0,
+      "stats": [{ "stat": "STR", "weight": 1 }],
+      "weakenedStat": "STR",
+      "debtRemaining": 0
+    },
+    "expected": { "xp": 25, "capped": false, "statXp": {}, "weakened": true, "repayment": 0 }
+  },
+  {
+    "note": "boss reward is cap-exempt and debt-exempt",
+    "input": {
+      "source": "boss",
+      "fullXp": 100,
+      "capRoom": 0,
+      "stats": [{ "stat": "STR", "weight": 1 }],
+      "weakenedStat": null,
+      "debtRemaining": 500
+    },
+    "expected": {
+      "xp": 100,
+      "capped": false,
+      "statXp": { "STR": 50 },
+      "weakened": false,
+      "repayment": 0
+    }
+  },
+  {
+    "note": "trial reward is debt-exempt; Weakened zeroes only its stat",
+    "input": {
+      "source": "trial",
+      "fullXp": 20,
+      "capRoom": 0,
+      "stats": [
+        { "stat": "STR", "weight": 1 },
+        { "stat": "AGI", "weight": 1 }
+      ],
+      "weakenedStat": "AGI",
+      "debtRemaining": 40
+    },
+    "expected": {
+      "xp": 20,
+      "capped": false,
+      "statXp": { "STR": 5 },
+      "weakened": true,
+      "repayment": 0
+    }
+  },
+  {
+    "note": "daily clear carries no stat XP and repays nothing",
+    "input": {
+      "source": "daily_clear",
+      "fullXp": 0,
+      "capRoom": 0,
+      "stats": [],
+      "weakenedStat": "STR",
+      "debtRemaining": 10
+    },
+    "expected": { "xp": 0, "capped": false, "statXp": {}, "weakened": false, "repayment": 0 }
+  },
+  {
+    "note": "a big quest under a big debt: half goes to repayment",
+    "input": {
+      "source": "quest",
+      "fullXp": 75,
+      "capRoom": 150,
+      "stats": [{ "stat": "STR", "weight": 1 }],
+      "weakenedStat": null,
+      "debtRemaining": 1000
+    },
+    "expected": {
+      "xp": 75,
+      "capped": false,
+      "statXp": { "STR": 37 },
+      "weakened": false,
+      "repayment": 37
+    }
+  }
+]

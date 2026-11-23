@@ -1,0 +1,23 @@
+{
+  "amount": [
+    { "note": "Lenient at level 1", "ratePercent": 10, "level": 1, "expected": 6 },
+    { "note": "Standard at level 1", "ratePercent": 20, "level": 1, "expected": 12 },
+    { "note": "escalated at level 1", "ratePercent": 30, "level": 1, "expected": 18 },
+    { "note": "Lenient at level 10", "ratePercent": 10, "level": 10, "expected": 35 },
+    { "note": "Standard at level 10", "ratePercent": 20, "level": 10, "expected": 70 },
+    { "note": "escalated at level 10", "ratePercent": 30, "level": 10, "expected": 105 },
+    { "note": "Lenient at level 20", "ratePercent": 10, "level": 20, "expected": 103 },
+    { "note": "Standard at level 20", "ratePercent": 20, "level": 20, "expected": 206 },
+    { "note": "escalated at level 20", "ratePercent": 30, "level": 20, "expected": 309 },
+    { "note": "Standard at level 30", "ratePercent": 20, "level": 30, "expected": 400 },
+    { "note": "escalated at level 30", "ratePercent": 30, "level": 30, "expected": 600 }
+  ],
+  "repayment": [
+    { "note": "half of an odd award, floored", "awardXp": 35, "remaining": 1000, "expected": 17 },
+    { "note": "a 1 XP award repays nothing", "awardXp": 1, "remaining": 50, "expected": 0 },
+    { "note": "a zero award repays nothing", "awardXp": 0, "remaining": 50, "expected": 0 },
+    { "note": "never more than what is left", "awardXp": 50, "remaining": 10, "expected": 10 },
+    { "note": "no debt, no repayment", "awardXp": 75, "remaining": 0, "expected": 0 },
+    { "note": "a reversal is never a repayment", "awardXp": -20, "remaining": 50, "expected": 0 }
+  ]
+}

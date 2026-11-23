@@ -84,6 +84,120 @@ describe('sqlConfigSlice', () => {
       game_day_start_hour: 3,
       free_points_per_daily_clear: 1,
       close_days_max_backfill: 30,
+      level_curve: GAME_CONFIG.levels,
+      stat_order: ['STR', 'AGI', 'VIT', 'INT', 'SENSE'],
+      award_sources: GAME_CONFIG.awardSources,
+      penalty: GAME_CONFIG.penalty,
+      stones: GAME_CONFIG.stones,
+      safe_zones: GAME_CONFIG.safeZones,
+      gym: GAME_CONFIG.gym,
     });
+  });
+});
+
+describe('Phase 2 config', () => {
+  it('holds the penalty modes and warning hours (3.1)', () => {
+    expect(GAME_CONFIG.penalty.modes).toEqual(['lenient', 'standard', 'hardcore']);
+    expect(GAME_CONFIG.penalty.defaultMode).toBe('standard');
+    expect(GAME_CONFIG.penalty.warningStartHour).toEqual({
+      lenient: 21,
+      standard: 23,
+      hardcore: 23,
+    });
+  });
+
+  it('holds the debt rates and the repayment share (3.4)', () => {
+    expect(GAME_CONFIG.penalty.debtRatePercent).toEqual({
+      lenient: 10,
+      standard: 20,
+      escalated: 30,
+    });
+    expect(GAME_CONFIG.penalty.debtRepaymentDivisor).toBe(2);
+  });
+
+  it('holds the trial rules, and no trial is about eating less (3.4)', () => {
+    const { trial } = GAME_CONFIG.penalty;
+    expect(trial.xp).toBe(20);
+    expect(trial.deadlineHours).toBe(24);
+    expect(trial.templates.fitness).toMatchObject({
+      goalType: 'duration',
+      target: 15,
+      statTags: ['STR', 'AGI'],
+    });
+    expect(trial.templates.diet).toMatchObject({
+      goalType: 'count',
+      target: 3,
+      statTags: ['VIT'],
+      tracking: 'auto_food_count',
+    });
+    expect(trial.templates.life).toMatchObject({
+      goalType: 'duration',
+      target: 45,
+      statTags: ['INT'],
+    });
+    for (const category of CATEGORIES) {
+      expect(trial.templates[category].title).not.toMatch(/calorie|kcal|deficit|fast/i);
+    }
+  });
+
+  it('holds the Weakened length and tie-break orders (3.4)', () => {
+    expect(GAME_CONFIG.penalty.weakenedDays).toBe(2);
+    expect(GAME_CONFIG.penalty.categoryOrder).toEqual(['fitness', 'diet', 'life']);
+  });
+
+  it('holds the award source exemptions (3.4, 4.3 - 4.5)', () => {
+    expect(GAME_CONFIG.awardSources).toEqual({
+      quest: { capped: true, repaysDebt: true },
+      workout: { capped: true, repaysDebt: true },
+      pr: { capped: false, repaysDebt: true },
+      boss: { capped: false, repaysDebt: false },
+      trial: { capped: false, repaysDebt: false },
+      daily_clear: { capped: false, repaysDebt: false },
+    });
+  });
+
+  it('holds the stone and safe zone limits (3.6 - 3.8)', () => {
+    expect(GAME_CONFIG.stones).toEqual({ streakInterval: 7, maxHeld: 3 });
+    expect(GAME_CONFIG.safeZones).toEqual({
+      maxRestDays: 2,
+      minPeriodDays: 1,
+      maxPeriodDays: 7,
+      quotaDays: 10,
+      quotaWindowDays: 30,
+    });
+  });
+
+  it('holds the gym numbers (4.1 - 4.6, step 0 G-i)', () => {
+    const { gym } = GAME_CONFIG;
+    expect(gym.kinds).toEqual({ strength: 'STR', cardio: 'AGI', mobility: 'VIT' });
+    expect(gym.libraryCategoryKinds).toEqual({
+      strength: 'strength',
+      powerlifting: 'strength',
+      'olympic weightlifting': 'strength',
+      strongman: 'strength',
+      cardio: 'cardio',
+      plyometrics: 'cardio',
+      stretching: 'mobility',
+    });
+    expect(gym.setXp).toBe(2);
+    expect(gym.maxWorkingSetsPerDay).toBe(20);
+    expect(gym.pr).toEqual({
+      xp: 25,
+      statXp: 10,
+      maxBonusesPerDay: 2,
+      e1rmMinReps: 1,
+      e1rmMaxReps: 12,
+      e1rmRepsDivisor: 30,
+      kinds: ['strength'],
+    });
+    expect(gym.boss).toEqual({
+      xpMultiplier: 2,
+      freePoints: 1,
+      maxActive: 5,
+      defaultTargetReps: 1,
+      kinds: ['strength'],
+    });
+    expect(gym.restTimer.defaultSeconds).toBe(90);
+    expect(gym.restTimer.stepSeconds).toBe(15);
   });
 });

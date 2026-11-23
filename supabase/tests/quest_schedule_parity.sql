@@ -337,6 +337,44 @@ begin
       'western timezone: created 03:00 local, so the new game day owns it', v_actual, false;
   end if;
 
+  -- a Survival Trial is never tallied on the day it was created
+  v_count := v_count + 1;
+  v_actual := public.quest_scheduled_on(
+    'trial', null, null,
+    timestamptz '2026-01-08T09:00:00Z',
+    null,
+    date '2026-01-08', 'Europe/Berlin');
+  if v_actual is distinct from false then
+    raise exception 'quest_scheduled_on mismatch (%): got %, expected %',
+      'a Survival Trial is never tallied on the day it was created', v_actual, false;
+  end if;
+
+  v_actual := public.quest_overdue_on(
+    'trial', null, date '2026-01-08', false);
+  if v_actual is distinct from false then
+    raise exception 'quest_overdue_on mismatch (%): got %, expected %',
+      'a Survival Trial is never tallied on the day it was created', v_actual, false;
+  end if;
+
+  -- an outstanding Survival Trial is never overdue the next day
+  v_count := v_count + 1;
+  v_actual := public.quest_scheduled_on(
+    'trial', null, null,
+    timestamptz '2026-01-08T09:00:00Z',
+    null,
+    date '2026-01-09', 'Europe/Berlin');
+  if v_actual is distinct from false then
+    raise exception 'quest_scheduled_on mismatch (%): got %, expected %',
+      'an outstanding Survival Trial is never overdue the next day', v_actual, false;
+  end if;
+
+  v_actual := public.quest_overdue_on(
+    'trial', null, date '2026-01-09', false);
+  if v_actual is distinct from false then
+    raise exception 'quest_overdue_on mismatch (%): got %, expected %',
+      'an outstanding Survival Trial is never overdue the next day', v_actual, false;
+  end if;
+
   raise notice 'quest schedule parity: % vectors passed', v_count;
 end;
 $$;

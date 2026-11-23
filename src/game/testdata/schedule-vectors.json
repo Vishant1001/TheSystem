@@ -11,7 +11,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-09",
     "isDone": false,
-    "expected": { "scheduled": true, "overdue": false }
+    "expected": {
+      "scheduled": true,
+      "overdue": false
+    }
   },
   {
     "note": "weekday-only quest on a Saturday",
@@ -25,7 +28,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-10",
     "isDone": false,
-    "expected": { "scheduled": false, "overdue": false }
+    "expected": {
+      "scheduled": false,
+      "overdue": false
+    }
   },
   {
     "note": "every-day quest on a Sunday",
@@ -39,7 +45,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-11",
     "isDone": false,
-    "expected": { "scheduled": true, "overdue": false }
+    "expected": {
+      "scheduled": true,
+      "overdue": false
+    }
   },
   {
     "note": "a daily quest scheduled for no days at all",
@@ -53,7 +62,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-09",
     "isDone": false,
-    "expected": { "scheduled": false, "overdue": false }
+    "expected": {
+      "scheduled": false,
+      "overdue": false
+    }
   },
   {
     "note": "created at 01:30 Berlin: before the rollover, so it belongs to the previous game day",
@@ -67,7 +79,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-08",
     "isDone": false,
-    "expected": { "scheduled": true, "overdue": false }
+    "expected": {
+      "scheduled": true,
+      "overdue": false
+    }
   },
   {
     "note": "the same quest did not exist the game day before that",
@@ -81,7 +96,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-07",
     "isDone": false,
-    "expected": { "scheduled": false, "overdue": false }
+    "expected": {
+      "scheduled": false,
+      "overdue": false
+    }
   },
   {
     "note": "created at 04:30 Berlin: past the rollover, so it starts the new game day",
@@ -95,7 +113,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-08",
     "isDone": false,
-    "expected": { "scheduled": false, "overdue": false }
+    "expected": {
+      "scheduled": false,
+      "overdue": false
+    }
   },
   {
     "note": "archived at 02:00 Berlin: counts as archived on the previous game day",
@@ -109,7 +130,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-09",
     "isDone": false,
-    "expected": { "scheduled": false, "overdue": false }
+    "expected": {
+      "scheduled": false,
+      "overdue": false
+    }
   },
   {
     "note": "the same quest was still live the game day before it was archived",
@@ -123,7 +147,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-08",
     "isDone": false,
-    "expected": { "scheduled": true, "overdue": false }
+    "expected": {
+      "scheduled": true,
+      "overdue": false
+    }
   },
   {
     "note": "one-time quest on its due day",
@@ -137,7 +164,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-10",
     "isDone": false,
-    "expected": { "scheduled": true, "overdue": false }
+    "expected": {
+      "scheduled": true,
+      "overdue": false
+    }
   },
   {
     "note": "one-time quest the day before it is due",
@@ -151,7 +181,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-09",
     "isDone": false,
-    "expected": { "scheduled": false, "overdue": false }
+    "expected": {
+      "scheduled": false,
+      "overdue": false
+    }
   },
   {
     "note": "one-time quest left undone after its due day is overdue, but counts for no day",
@@ -165,7 +198,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-11",
     "isDone": false,
-    "expected": { "scheduled": false, "overdue": true }
+    "expected": {
+      "scheduled": false,
+      "overdue": true
+    }
   },
   {
     "note": "the same quest once completed is no longer overdue",
@@ -179,7 +215,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-11",
     "isDone": true,
-    "expected": { "scheduled": false, "overdue": false }
+    "expected": {
+      "scheduled": false,
+      "overdue": false
+    }
   },
   {
     "note": "an undated one-time quest never counts for a day and is never overdue",
@@ -193,7 +232,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-11",
     "isDone": false,
-    "expected": { "scheduled": false, "overdue": false }
+    "expected": {
+      "scheduled": false,
+      "overdue": false
+    }
   },
   {
     "note": "a daily quest is never overdue",
@@ -207,7 +249,10 @@
     "timezone": "Europe/Berlin",
     "day": "2026-01-11",
     "isDone": false,
-    "expected": { "scheduled": true, "overdue": false }
+    "expected": {
+      "scheduled": true,
+      "overdue": false
+    }
   },
   {
     "note": "western timezone: created 02:00 local, so the previous game day owns it",
@@ -221,7 +266,10 @@
     "timezone": "America/Los_Angeles",
     "day": "2026-01-08",
     "isDone": false,
-    "expected": { "scheduled": true, "overdue": false }
+    "expected": {
+      "scheduled": true,
+      "overdue": false
+    }
   },
   {
     "note": "western timezone: created 03:00 local, so the new game day owns it",
@@ -235,6 +283,43 @@
     "timezone": "America/Los_Angeles",
     "day": "2026-01-08",
     "isDone": false,
-    "expected": { "scheduled": false, "overdue": false }
+    "expected": {
+      "scheduled": false,
+      "overdue": false
+    }
+  },
+  {
+    "note": "a Survival Trial is never tallied on the day it was created",
+    "quest": {
+      "type": "trial",
+      "scheduleDays": null,
+      "dueOn": null,
+      "createdAt": "2026-01-08T09:00:00Z",
+      "archivedAt": null
+    },
+    "timezone": "Europe/Berlin",
+    "day": "2026-01-08",
+    "isDone": false,
+    "expected": {
+      "scheduled": false,
+      "overdue": false
+    }
+  },
+  {
+    "note": "an outstanding Survival Trial is never overdue the next day",
+    "quest": {
+      "type": "trial",
+      "scheduleDays": null,
+      "dueOn": null,
+      "createdAt": "2026-01-08T09:00:00Z",
+      "archivedAt": null
+    },
+    "timezone": "Europe/Berlin",
+    "day": "2026-01-09",
+    "isDone": false,
+    "expected": {
+      "scheduled": false,
+      "overdue": false
+    }
   }
 ]

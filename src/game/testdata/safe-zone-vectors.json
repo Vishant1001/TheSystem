@@ -1,0 +1,133 @@
+{
+  "start": [
+    {
+      "note": "Standard, one second before 23:00 Berlin: starts today",
+      "now": "2026-12-07T21:59:59Z",
+      "timeZone": "Europe/Berlin",
+      "mode": "standard",
+      "expected": "2026-12-07"
+    },
+    {
+      "note": "Standard, at 23:00 Berlin: starts tomorrow",
+      "now": "2026-12-07T22:00:00Z",
+      "timeZone": "Europe/Berlin",
+      "mode": "standard",
+      "expected": "2026-12-08"
+    },
+    {
+      "note": "02:30 is still the previous game day, after its warning: tomorrow",
+      "now": "2026-12-08T01:30:00Z",
+      "timeZone": "Europe/Berlin",
+      "mode": "standard",
+      "expected": "2026-12-08"
+    },
+    {
+      "note": "Lenient warns at 21:00, so 20:59 still starts today",
+      "now": "2026-12-07T19:59:00Z",
+      "timeZone": "Europe/Berlin",
+      "mode": "lenient",
+      "expected": "2026-12-07"
+    },
+    {
+      "note": "Lenient at 21:00: tomorrow",
+      "now": "2026-12-07T20:00:00Z",
+      "timeZone": "Europe/Berlin",
+      "mode": "lenient",
+      "expected": "2026-12-08"
+    },
+    {
+      "note": "just after the rollover: a fresh day, starts today",
+      "now": "2026-12-07T02:30:00Z",
+      "timeZone": "Europe/Berlin",
+      "mode": "hardcore",
+      "expected": "2026-12-07"
+    },
+    {
+      "note": "India, no DST: 22:59 IST starts today",
+      "now": "2026-12-07T17:29:00Z",
+      "timeZone": "Asia/Kolkata",
+      "mode": "standard",
+      "expected": "2026-12-07"
+    }
+  ],
+  "quota": [
+    {
+      "note": "an empty history allows a full week",
+      "existing": [],
+      "startOn": "2026-12-07",
+      "days": 7,
+      "expected": null
+    },
+    {
+      "note": "7 booked plus 3 is exactly the quota",
+      "existing": [{ "startOn": "2026-12-01", "endOn": "2026-12-07", "endedEarlyOn": null }],
+      "startOn": "2026-12-10",
+      "days": 3,
+      "expected": null
+    },
+    {
+      "note": "7 booked plus 4 is over",
+      "existing": [{ "startOn": "2026-12-01", "endOn": "2026-12-07", "endedEarlyOn": null }],
+      "startOn": "2026-12-10",
+      "days": 4,
+      "expected": "SAFE_QUOTA_EXCEEDED"
+    },
+    {
+      "note": "an early end gives the unused days back",
+      "existing": [
+        { "startOn": "2026-12-01", "endOn": "2026-12-07", "endedEarlyOn": "2026-12-04" }
+      ],
+      "startOn": "2026-12-10",
+      "days": 7,
+      "expected": null
+    },
+    {
+      "note": "periods may not overlap",
+      "existing": [{ "startOn": "2026-12-05", "endOn": "2026-12-09", "endedEarlyOn": null }],
+      "startOn": "2026-12-08",
+      "days": 2,
+      "expected": "SAFE_PERIOD_OVERLAP"
+    },
+    {
+      "note": "zero days is not a period",
+      "existing": [],
+      "startOn": "2026-12-08",
+      "days": 0,
+      "expected": "SAFE_PERIOD_LENGTH"
+    },
+    {
+      "note": "eight days is too long",
+      "existing": [],
+      "startOn": "2026-12-08",
+      "days": 8,
+      "expected": "SAFE_PERIOD_LENGTH"
+    },
+    {
+      "note": "the oldest booked day has left the 30-day window",
+      "existing": [
+        { "startOn": "2026-12-01", "endOn": "2026-12-07", "endedEarlyOn": null },
+        { "startOn": "2026-12-20", "endOn": "2026-12-22", "endedEarlyOn": null }
+      ],
+      "startOn": "2026-12-31",
+      "days": 1,
+      "expected": null
+    },
+    {
+      "note": "one day earlier, all 11 days share a window",
+      "existing": [
+        { "startOn": "2026-12-01", "endOn": "2026-12-07", "endedEarlyOn": null },
+        { "startOn": "2026-12-20", "endOn": "2026-12-22", "endedEarlyOn": null }
+      ],
+      "startOn": "2026-12-30",
+      "days": 1,
+      "expected": "SAFE_QUOTA_EXCEEDED"
+    },
+    {
+      "note": "a future booking counts against an earlier new period",
+      "existing": [{ "startOn": "2026-12-20", "endOn": "2026-12-26", "endedEarlyOn": null }],
+      "startOn": "2026-12-10",
+      "days": 4,
+      "expected": "SAFE_QUOTA_EXCEEDED"
+    }
+  ]
+}

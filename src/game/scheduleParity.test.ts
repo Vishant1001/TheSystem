@@ -17,7 +17,7 @@ import vectors from './testdata/schedule-vectors.json';
 function toScheduleInput(vector: (typeof vectors)[number]): ScheduleInput {
   const { quest, timezone } = vector;
   return {
-    type: quest.type === 'one_time' ? 'one_time' : 'daily',
+    type: quest.type === 'one_time' || quest.type === 'trial' ? quest.type : 'daily',
     scheduleDays: quest.scheduleDays,
     dueOn: quest.dueOn,
     createdOn: gameDateAt(new Date(quest.createdAt), timezone),

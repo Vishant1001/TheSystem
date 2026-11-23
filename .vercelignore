@@ -12,3 +12,6 @@ supabase/.branches
 dist
 dev-dist
 coverage
+
+# local notes holding Supabase keys
+SupabaseKeys.txt

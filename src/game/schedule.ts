@@ -7,7 +7,8 @@
  * live here as a pure function with tests rather than inline in a component.
  */
 
-export type QuestType = 'daily' | 'one_time';
+/** 'trial' is a Survival Trial (brief 3.4): pinned to the board, owned by no day. */
+export type QuestType = 'daily' | 'one_time' | 'trial';
 
 export interface ScheduleInput {
   type: QuestType;
@@ -53,6 +54,8 @@ export function wasActiveOn(input: ScheduleInput, day: string): boolean {
  */
 export function isScheduledOn(input: ScheduleInput, day: string): boolean {
   if (!wasActiveOn(input, day)) return false;
+  // A trial is never core and never tallied; its deadline is an instant.
+  if (input.type === 'trial') return false;
 
   if (input.type === 'daily') {
     if (input.scheduleDays === null || input.scheduleDays.length === 0) return false;

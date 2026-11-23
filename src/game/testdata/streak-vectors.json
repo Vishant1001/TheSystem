@@ -1,0 +1,51 @@
+[
+  {
+    "note": "two weeks of clears earn a stone at day 7 and day 14",
+    "effects": "EEEEEEEEEEEEEE",
+    "modes": "SSSSSSSSSSSSSS",
+    "spentAfter": {},
+    "expected": { "finalStreak": 14, "finalHeld": 2, "stoneDays": [7, 14] }
+  },
+  {
+    "note": "no stone beyond three held",
+    "effects": "EEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+    "modes": "SSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+    "spentAfter": {},
+    "expected": { "finalStreak": 28, "finalHeld": 3, "stoneDays": [7, 14, 21] }
+  },
+  {
+    "note": "spending one below the cap lets the next multiple earn again",
+    "effects": "EEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+    "modes": "SSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+    "spentAfter": { "22": 1 },
+    "expected": { "finalStreak": 28, "finalHeld": 3, "stoneDays": [7, 14, 21, 28] }
+  },
+  {
+    "note": "a failed day resets the streak",
+    "effects": "EEEEEEREEEEEEE",
+    "modes": "SSSSSSSSSSSSSS",
+    "spentAfter": {},
+    "expected": { "finalStreak": 7, "finalHeld": 1, "stoneDays": [14] }
+  },
+  {
+    "note": "rest and safe days neither break nor extend",
+    "effects": "EEENNEEEE",
+    "modes": "SSSSSSSSS",
+    "spentAfter": {},
+    "expected": { "finalStreak": 7, "finalHeld": 1, "stoneDays": [9] }
+  },
+  {
+    "note": "Hardcore earns nothing, and a multiple reached in Hardcore is not paid later",
+    "effects": "EEEEEEEEEEEEEE",
+    "modes": "LLLLLLHSSSSSSS",
+    "spentAfter": {},
+    "expected": { "finalStreak": 14, "finalHeld": 1, "stoneDays": [14] }
+  },
+  {
+    "note": "Lenient earns like Standard",
+    "effects": "EEEEEEE",
+    "modes": "LLLLLLL",
+    "spentAfter": {},
+    "expected": { "finalStreak": 7, "finalHeld": 1, "stoneDays": [7] }
+  }
+]

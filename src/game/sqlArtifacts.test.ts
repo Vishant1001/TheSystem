@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { GAME_CONFIG, sqlConfigSlice } from './config';
 import vectors from './testdata/game-date-vectors.json';
 import scheduleVectors from './testdata/schedule-vectors.json';
-import configMigration from '../../supabase/migrations/20261122000300_game_config.sql?raw';
+import configMigration from '../../supabase/migrations/20261123000100_game_config_v2.sql?raw';
+import phase1ConfigMigration from '../../supabase/migrations/20261122000300_game_config.sql?raw';
 import parityTest from '../../supabase/tests/game_date_parity.sql?raw';
 import scheduleParityTest from '../../supabase/tests/quest_schedule_parity.sql?raw';
 
@@ -37,6 +38,14 @@ describe('generated game_config migration', () => {
 
   it('upserts, so re-running the migration is safe', () => {
     expect(configMigration).toContain('on conflict (key) do update');
+  });
+
+  it('re-seeds every key of the frozen Phase 1 seed, so the newest value wins', () => {
+    // The Phase 1 seed is applied on hosted and never edited (forward-only).
+    const phase1 = parseSeededConfig(phase1ConfigMigration);
+    const latest = parseSeededConfig(configMigration);
+    expect(Object.keys(phase1).length).toBeGreaterThan(0);
+    for (const key of Object.keys(phase1)) expect(latest).toHaveProperty(key);
   });
 });
 

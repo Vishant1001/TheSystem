@@ -29,3 +29,6 @@ logs
 
 # local, machine-specific Claude Code settings
 .claude/settings.local.json
+
+# local notes holding Supabase keys: never commit or upload
+SupabaseKeys.txt

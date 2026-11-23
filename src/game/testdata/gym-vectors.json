@@ -1,0 +1,199 @@
+{
+  "e1rm": [
+    { "note": "100 kg x 5", "weightCentiKg": 10000, "reps": 5, "expected": 11667 },
+    { "note": "60 kg x 8, exact", "weightCentiKg": 6000, "reps": 8, "expected": 7600 },
+    { "note": "80 kg x 1", "weightCentiKg": 8000, "reps": 1, "expected": 8267 },
+    { "note": "the top of the rep range", "weightCentiKg": 5000, "reps": 12, "expected": 7000 },
+    { "note": "above the rep range", "weightCentiKg": 5000, "reps": 13, "expected": null },
+    { "note": "zero reps", "weightCentiKg": 5000, "reps": 0, "expected": null },
+    { "note": "exactly half a centi-kg rounds up", "weightCentiKg": 15, "reps": 3, "expected": 17 },
+    { "note": "no weight", "weightCentiKg": 0, "reps": 5, "expected": null },
+    { "note": "the toast example, 77.5 kg x 6", "weightCentiKg": 7750, "reps": 6, "expected": 9300 }
+  ],
+  "prs": [
+    {
+      "note": "first time ever: both kinds are baselines, no bonus",
+      "kind": "strength",
+      "prior": { "e1rm": null, "maxWeight": null },
+      "sets": [
+        { "setType": "working", "reps": 5, "weightKg": 100 },
+        { "setType": "working", "reps": 8, "weightKg": 80 }
+      ],
+      "expected": {
+        "records": [
+          { "prKind": "e1rm", "valueCentiKg": 11667, "setIndex": 0, "baseline": true },
+          { "prKind": "max_weight", "valueCentiKg": 10000, "setIndex": 0, "baseline": true }
+        ],
+        "bonusSetIndexes": []
+      }
+    },
+    {
+      "note": "one set breaks both records: one bonus; warmups ignored",
+      "kind": "strength",
+      "prior": { "e1rm": 11000, "maxWeight": 9500 },
+      "sets": [
+        { "setType": "warmup", "reps": 3, "weightKg": 120 },
+        { "setType": "working", "reps": 5, "weightKg": 100 }
+      ],
+      "expected": {
+        "records": [
+          { "prKind": "e1rm", "valueCentiKg": 11667, "setIndex": 1, "baseline": false },
+          { "prKind": "max_weight", "valueCentiKg": 10000, "setIndex": 1, "baseline": false }
+        ],
+        "bonusSetIndexes": [1]
+      }
+    },
+    {
+      "note": "e1RM record only",
+      "kind": "strength",
+      "prior": { "e1rm": 11000, "maxWeight": 12000 },
+      "sets": [{ "setType": "working", "reps": 5, "weightKg": 100 }],
+      "expected": {
+        "records": [{ "prKind": "e1rm", "valueCentiKg": 11667, "setIndex": 0, "baseline": false }],
+        "bonusSetIndexes": [0]
+      }
+    },
+    {
+      "note": "two different sets break the two records: two bonuses",
+      "kind": "strength",
+      "prior": { "e1rm": 12000, "maxWeight": 10000 },
+      "sets": [
+        { "setType": "working", "reps": 1, "weightKg": 105 },
+        { "setType": "working", "reps": 10, "weightKg": 95 }
+      ],
+      "expected": {
+        "records": [
+          { "prKind": "e1rm", "valueCentiKg": 12667, "setIndex": 1, "baseline": false },
+          { "prKind": "max_weight", "valueCentiKg": 10500, "setIndex": 0, "baseline": false }
+        ],
+        "bonusSetIndexes": [0, 1]
+      }
+    },
+    {
+      "note": "matching a record is not a record",
+      "kind": "strength",
+      "prior": { "e1rm": 11667, "maxWeight": 10000 },
+      "sets": [{ "setType": "working", "reps": 5, "weightKg": 100 }],
+      "expected": { "records": [], "bonusSetIndexes": [] }
+    },
+    {
+      "note": "cardio never has records",
+      "kind": "cardio",
+      "prior": { "e1rm": null, "maxWeight": null },
+      "sets": [{ "setType": "working", "reps": 5, "weightKg": 20 }],
+      "expected": { "records": [], "bonusSetIndexes": [] }
+    },
+    {
+      "note": "mobility never has records",
+      "kind": "mobility",
+      "prior": { "e1rm": null, "maxWeight": null },
+      "sets": [{ "setType": "working", "reps": 5, "weightKg": 20 }],
+      "expected": { "records": [], "bonusSetIndexes": [] }
+    },
+    {
+      "note": "13 reps has no e1RM but can still be the heaviest",
+      "kind": "strength",
+      "prior": { "e1rm": 5000, "maxWeight": 6000 },
+      "sets": [{ "setType": "working", "reps": 13, "weightKg": 70 }],
+      "expected": {
+        "records": [
+          { "prKind": "max_weight", "valueCentiKg": 7000, "setIndex": 0, "baseline": false }
+        ],
+        "bonusSetIndexes": [0]
+      }
+    },
+    {
+      "note": "ties inside a workout go to the earliest set",
+      "kind": "strength",
+      "prior": { "e1rm": null, "maxWeight": null },
+      "sets": [
+        { "setType": "working", "reps": 5, "weightKg": 100 },
+        { "setType": "working", "reps": 5, "weightKg": 100 }
+      ],
+      "expected": {
+        "records": [
+          { "prKind": "e1rm", "valueCentiKg": 11667, "setIndex": 0, "baseline": true },
+          { "prKind": "max_weight", "valueCentiKg": 10000, "setIndex": 0, "baseline": true }
+        ],
+        "bonusSetIndexes": []
+      }
+    },
+    {
+      "note": "bodyweight sets set no records",
+      "kind": "strength",
+      "prior": { "e1rm": null, "maxWeight": null },
+      "sets": [
+        { "setType": "working", "reps": 10, "weightKg": null },
+        { "setType": "working", "reps": 10, "weightKg": 0 }
+      ],
+      "expected": { "records": [], "bonusSetIndexes": [] }
+    }
+  ],
+  "payableBonuses": [
+    { "candidates": 2, "alreadyPaidToday": 0, "expected": 2 },
+    { "candidates": 3, "alreadyPaidToday": 0, "expected": 2 },
+    { "candidates": 1, "alreadyPaidToday": 1, "expected": 1 },
+    { "candidates": 2, "alreadyPaidToday": 1, "expected": 1 },
+    { "candidates": 1, "alreadyPaidToday": 2, "expected": 0 }
+  ],
+  "setXp": [
+    {
+      "note": "8 working strength sets and 2 warmups",
+      "countedToday": 0,
+      "sets": "wS wS sS sS sS sS sS sS sS sS",
+      "expected": { "countedSets": 8, "fullXp": 16, "stats": [{ "stat": "STR", "weight": 8 }] }
+    },
+    {
+      "note": "only the first 5 working sets fit under the daily 20",
+      "countedToday": 15,
+      "sets": "sS sS sS sS sS sC sC sC sM sM",
+      "expected": { "countedSets": 5, "fullXp": 10, "stats": [{ "stat": "STR", "weight": 5 }] }
+    },
+    {
+      "note": "mixed kinds weigh their own stats, in kind order",
+      "countedToday": 0,
+      "sets": "sC sS sM sS",
+      "expected": {
+        "countedSets": 4,
+        "fullXp": 8,
+        "stats": [
+          { "stat": "STR", "weight": 2 },
+          { "stat": "AGI", "weight": 1 },
+          { "stat": "VIT", "weight": 1 }
+        ]
+      }
+    },
+    {
+      "note": "the daily allowance already used",
+      "countedToday": 20,
+      "sets": "sS sS",
+      "expected": { "countedSets": 0, "fullXp": 0, "stats": [] }
+    }
+  ],
+  "bosses": [
+    {
+      "note": "weight and reps both met",
+      "boss": { "kind": "strength", "targetWeightKg": 100, "targetReps": 1 },
+      "set": { "setType": "working", "reps": 1, "weightKg": 100 },
+      "expected": true
+    },
+    {
+      "note": "heavier but too few reps",
+      "boss": { "kind": "strength", "targetWeightKg": 100, "targetReps": 3 },
+      "set": { "setType": "working", "reps": 2, "weightKg": 110 },
+      "expected": false
+    },
+    {
+      "note": "a warmup never defeats a boss",
+      "boss": { "kind": "strength", "targetWeightKg": 60, "targetReps": 1 },
+      "set": { "setType": "warmup", "reps": 5, "weightKg": 100 },
+      "expected": false
+    },
+    {
+      "note": "2.5 kg short",
+      "boss": { "kind": "strength", "targetWeightKg": 100, "targetReps": 1 },
+      "set": { "setType": "working", "reps": 5, "weightKg": 97.5 },
+      "expected": false
+    }
+  ]
+}
