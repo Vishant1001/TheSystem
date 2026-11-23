@@ -9,9 +9,17 @@ import type { QuestView } from '../../lib/queries/quests';
 interface QuestCardProps {
   view: QuestView;
   pending: boolean;
+  /** Live reading for an auto quest, e.g. the calorie window status (5.8). */
+  liveStatus?: { text: string; tone: 'steel' | 'system' | 'penalty' } | undefined;
   onComplete: (value: number | null) => void;
   onUndo: () => void;
 }
+
+const liveTone = {
+  steel: 'text-steel/90',
+  system: 'text-system-glow',
+  penalty: 'text-penalty-text',
+} as const;
 
 const difficultyTone: Record<Difficulty, string> = {
   E: 'border-steel/40 text-steel',
@@ -22,7 +30,7 @@ const difficultyTone: Record<Difficulty, string> = {
   S: 'border-monarch/70 text-monarch-text',
 };
 
-export function QuestCard({ view, pending, onComplete, onUndo }: QuestCardProps) {
+export function QuestCard({ view, pending, liveStatus, onComplete, onUndo }: QuestCardProps) {
   const { quest, isDone, isAuto, needsValue, overdue } = view;
   const [value, setValue] = useState('');
 
@@ -85,9 +93,23 @@ export function QuestCard({ view, pending, onComplete, onUndo }: QuestCardProps)
 
       <div className="flex items-center gap-2">
         {isAuto ? (
-          <span className="font-display text-[0.6875rem] tracking-wider text-steel/90 uppercase">
-            {isDone ? systemCopy.quests.done : systemCopy.quests.autoTracked}
-          </span>
+          <div className="flex flex-wrap items-center gap-x-2">
+            <span
+              className={`font-display text-[0.6875rem] tracking-wider uppercase ${
+                isDone ? 'text-system-glow' : 'text-steel/90'
+              }`}
+            >
+              {isDone ? systemCopy.quests.done : systemCopy.quests.autoTracked}
+            </span>
+            {liveStatus !== undefined && (
+              <span
+                className={`font-display text-[0.6875rem] tracking-wider ${liveTone[liveStatus.tone]}`}
+                data-readout
+              >
+                {liveStatus.text}
+              </span>
+            )}
+          </div>
         ) : isDone ? (
           <>
             <span className="font-display text-[0.6875rem] tracking-wider text-system-glow uppercase">

@@ -33,6 +33,7 @@ declare
   v_day date;
   v_days jsonb;
   v_last_closed date;
+  v_event_id uuid;
   v_timezone text;
 begin
   perform set_config(
@@ -176,6 +177,14 @@ begin
     raise exception 'D: Hit protein should award 20 XP, got %',
       v_result -> 'auto_protein' -> 'result' ->> 'xp';
   end if;
+  v_event_id := (v_result -> 'auto_protein' -> 'result' ->> 'event_id')::uuid;
+
+  select coalesce(sum(xp), 0) into v_total
+  from public.xp_events
+  where user_id = v_user and occurred_on = v_today and category = 'diet';
+  if v_total <> 20 then
+    raise exception 'D: the diet ledger should read 20 after the award, got %', v_total;
+  end if;
 
   v_result := public.delete_food(
     (select id from public.food_entries where user_id = v_user and name = 'Shake')
@@ -185,7 +194,55 @@ begin
       v_result -> 'auto_protein' ->> 'action';
   end if;
 
-  raise notice 'D. auto protein: completes on crossing the target, reverses below it';
+  -- 5.8: the quest is withdrawn, and the ledger says so.
+  if public.active_completion_id(v_protein.id, v_today) is not null then
+    raise exception 'D: Hit protein should have no live completion after the reversal';
+  end if;
+
+  if not exists (
+    select 1 from public.xp_events
+    where user_id = v_user
+      and source_type = 'reversal'
+      and reverses_event_id = v_event_id
+      and xp = -20
+      and vit_xp = -5
+      and str_xp = -5
+  ) then
+    raise exception 'D: expected a negating reversal event against the original award';
+  end if;
+
+  -- ADR-1: nothing was deleted, so both events remain and net to zero.
+  select coalesce(sum(xp), 0) into v_total
+  from public.xp_events
+  where user_id = v_user and occurred_on = v_today and category = 'diet';
+  if v_total <> 0 then
+    raise exception 'D: diet XP should return to 0 after the reversal, got %', v_total;
+  end if;
+
+  select count(*) into v_count
+  from public.xp_events
+  where user_id = v_user and occurred_on = v_today and category = 'diet';
+  if v_count <> 2 then
+    raise exception 'D: expected the award and its reversal to both remain, got % rows', v_count;
+  end if;
+
+  -- Crossing the target again re-awards it, so cap room came back too.
+  v_result := public.log_food('Second shake', 200, 60);
+  if v_result -> 'auto_protein' ->> 'action' <> 'completed' then
+    raise exception 'D: crossing the target again should complete the quest, got %',
+      v_result -> 'auto_protein' ->> 'action';
+  end if;
+  if (v_result -> 'auto_protein' -> 'result' ->> 'xp')::integer <> 20 then
+    raise exception 'D: the re-award should pay full XP, got %',
+      v_result -> 'auto_protein' -> 'result' ->> 'xp';
+  end if;
+
+  -- Leave the day as section E expects to find it.
+  perform public.delete_food(
+    (select id from public.food_entries where user_id = v_user and name = 'Second shake')
+  );
+
+  raise notice 'D. auto protein: completes, reverses into the ledger, and re-awards';
 
   -- =========================================================================
   -- E. Daily caps (acceptance 1.5, rule 5.6)

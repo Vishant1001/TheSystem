@@ -43,6 +43,10 @@ export function SettingsScreen() {
     onError: (mutationError) => {
       setFormError(systemMessage(mutationError));
     },
+    // The RPC may have committed even if the client could not read the reply.
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: hunterSnapshotKey });
+    },
   });
 
   if (isPending) return <SystemLoading />;

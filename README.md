@@ -63,3 +63,27 @@ src/
   styles/      app.css - Tailwind v4 @theme design tokens
 supabase/      migrations (step 1.3)
 ```
+
+## Conventions
+
+### Mutations re-sync on settle, not on success
+
+Every mutation invalidates its affected queries in **`onSettled`**, so the
+refresh happens whether the call succeeded or failed:
+
+```ts
+onSettled: async () => {
+  await invalidate(day);
+},
+```
+
+The reason is a failure mode we hit for real in step 1.6: `delete_workout`
+committed in the database — the workout was gone and the quest reversed — but
+the client could not parse the reply, so it took the error path. With the
+invalidation in `onSuccess` the screen kept showing a workout that no longer
+existed. A mutation that errors on the client tells you nothing about whether
+the server committed, so the screen must always re-read the database.
+
+Per-call UI reactions (toasts, redirects, cache priming) stay in the
+`onSuccess` / `onError` callbacks at the call site. Only the re-sync belongs in
+`onSettled`.

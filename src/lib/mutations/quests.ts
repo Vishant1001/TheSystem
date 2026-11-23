@@ -62,7 +62,7 @@ export function useCompleteQuest(day: string | undefined) {
       if (error) throw error;
       return questAwardSchema.parse(data);
     },
-    onSuccess: async () => {
+    onSettled: async () => {
       await invalidate(day);
     },
   });
@@ -78,7 +78,7 @@ export function useUndoCompletion(day: string | undefined) {
       });
       if (error) throw error;
     },
-    onSuccess: async () => {
+    onSettled: async () => {
       await invalidate(day);
     },
   });
@@ -93,7 +93,7 @@ export function useCreateQuest() {
       if (error) throw error;
       return data;
     },
-    onSuccess: async () => {
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: questsKey });
     },
   });
@@ -113,7 +113,7 @@ export function useUpdateQuest() {
       if (error) throw error;
       return data;
     },
-    onSuccess: async () => {
+    onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: questsKey });
     },
   });
@@ -131,7 +131,7 @@ export function useArchiveQuest() {
         .eq('id', id);
       if (error) throw error;
     },
-    onSuccess: async () => {
+    onSettled: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: questsKey }),
         queryClient.invalidateQueries({ queryKey: hunterSnapshotKey }),

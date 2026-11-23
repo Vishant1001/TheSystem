@@ -8,6 +8,7 @@ import { useToast } from '../../components/toastContext';
 import { systemCopy } from '../../copy/system';
 import { awardedStats, useCompleteQuest, useUndoCompletion } from '../../lib/mutations/quests';
 import { useHunterSnapshot } from '../../lib/queries/hunterSnapshot';
+import { kcalStatus, sumFood, useFood } from '../../lib/queries/logs';
 import {
   buildQuestBoard,
   useCompletions,
@@ -23,6 +24,7 @@ export function QuestsScreen() {
   const timezone = snapshot.data?.hunter.timezone;
 
   const quests = useQuests();
+  const food = useFood(day);
   const completions = useCompletions(day);
   const oneTimeCompletions = useOneTimeCompletions();
   const toast = useToast();
@@ -59,6 +61,41 @@ export function QuestsScreen() {
   }
 
   const busy = complete.isPending || undo.isPending;
+  const totals = sumFood(food.data);
+  const targets = snapshot.data?.effective_targets_today;
+
+  /**
+   * 5.8: the calorie quest is judged only at day close, so the board reports
+   * where the day stands without settling anything. Protein shows progress
+   * towards the target that is in force today.
+   */
+  function liveStatusFor(
+    tracking: string,
+  ): { text: string; tone: 'steel' | 'system' | 'penalty' } | undefined {
+    if (targets === undefined) return undefined;
+
+    if (tracking === 'auto_kcal_range') {
+      const status = kcalStatus(totals.kcal, targets.kcal_min, targets.kcal_max);
+      const text = {
+        empty: systemCopy.log.kcalEmpty,
+        below: systemCopy.log.kcalBelow,
+        in_range: systemCopy.log.kcalInRange,
+        over: systemCopy.log.kcalOver,
+      }[status];
+      const tone = status === 'in_range' ? 'system' : status === 'over' ? 'penalty' : 'steel';
+      return { text: `${String(totals.kcal)} kcal · ${text}`, tone };
+    }
+
+    if (tracking === 'auto_protein_min') {
+      const met = totals.proteinG >= targets.protein_target_g;
+      return {
+        text: `${String(totals.proteinG)} / ${String(targets.protein_target_g)} g`,
+        tone: met ? 'system' : 'steel',
+      };
+    }
+
+    return undefined;
+  }
 
   function handleComplete(questId: string, value: number | null) {
     complete.mutate(
@@ -114,6 +151,7 @@ export function QuestsScreen() {
                 key={view.quest.id}
                 view={view}
                 pending={busy}
+                liveStatus={liveStatusFor(view.quest.tracking)}
                 onComplete={(value) => {
                   handleComplete(view.quest.id, value);
                 }}
