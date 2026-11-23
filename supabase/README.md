@@ -20,21 +20,15 @@ Never edit `20261122000300_game_config.sql` by hand. Change
 `src/game/game-config.json`, then run `npm run gen:sql`. A Vitest test parses
 the generated file and fails if the two drift (ADR-4).
 
-## Setting up the Supabase project
+## Setting up the hosted project
 
-1. Create a project at [supabase.com](https://supabase.com/dashboard) — any
-   region near you; note the database password somewhere safe.
-2. **Project Settings → API**: copy the _Project URL_ and the _anon public_ key
-   into `.env.local` as `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. The
-   `service_role` key must never leave the dashboard — it is not used anywhere
-   in this project.
-3. **Authentication → Sign In / Providers → Email**: leave _Email_ enabled and
-   turn **Confirm email** off. This is a personal single-user app; with
-   confirmation on, sign-up cannot sign you straight in and onboarding stalls.
-4. **Authentication → URL Configuration**: set the Site URL to
-   `http://localhost:5173` while developing, and add your Vercel URL later.
-5. Apply the migrations (below), then come back for
-   `npx supabase gen types typescript` in step 1.4.
+The full, numbered checklist — project creation, auth settings, linking, the
+push and the read-only check — is in the root README, section
+[4. Going live](../README.md#4-going-live). It is kept in one place so the two
+cannot drift.
+
+`.env.local` always points at the **local** stack. The hosted URL and key go
+into Vercel's environment variables, never into `.env.local`.
 
 ## Applying the migrations
 
@@ -57,19 +51,25 @@ That wipes and rebuilds the **local** database only.
 
 ### To your hosted project
 
-Either paste each migration into the dashboard SQL editor in filename order, or
-link the project and push:
-
 ```powershell
 npx supabase link --project-ref your-project-ref
 ```
 
 ```powershell
-npx supabase db push
+npx supabase db push --remote --dry-run
 ```
 
-`db push` writes to your hosted database. Review the SQL first — it is yours to
-run, and nothing in this repo runs it for you.
+```powershell
+npx supabase db push --remote
+```
+
+> **`--remote` is required.** In the current Supabase CLI `db push` targets the
+> local database by default; without the flag nothing reaches the hosted
+> project.
+
+`db push --remote` writes to your hosted database. Review the SQL first — it is
+yours to run, and nothing in this repo runs it for you. Then run
+`tests/hosted_readonly_check.sql` in the dashboard SQL editor.
 
 ## Verifying after you apply
 

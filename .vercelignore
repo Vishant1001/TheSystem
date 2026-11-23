@@ -1,0 +1,14 @@
+# Never upload local configuration if deploying with `npx vercel` from this
+# folder. Production values come from the Vercel project's environment
+# variables, and vite.config.ts refuses a Vercel build that points at a local
+# stack.
+.env
+.env.*
+!.env.example
+
+# Local tooling that has no business on a build server.
+supabase/.temp
+supabase/.branches
+dist
+dev-dist
+coverage

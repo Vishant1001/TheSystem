@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { EmptyState } from '../../components/EmptyState';
 import { SystemButton } from '../../components/SystemButton';
 import { SystemField, SystemInput } from '../../components/SystemField';
-import { SystemLoading } from '../../components/SystemStates';
+import { SystemErrorPanel, SystemLoading } from '../../components/SystemStates';
 import { XpBar } from '../../components/XpBar';
 import { useToast } from '../../components/toastContext';
 import { systemCopy } from '../../copy/system';
@@ -98,37 +98,48 @@ export function FoodTab({ snapshot }: { snapshot: HunterSnapshot }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-baseline justify-between">
-            <span className="text-xs tracking-wide text-steel">{systemCopy.log.kcalLabel}</span>
-            <span className="font-display text-sm text-hunter" data-readout>
-              {totals.kcal} / {targets.kcal_min}–{targets.kcal_max}
+      {food.isError ? (
+        <SystemErrorPanel
+          message={systemMessage(food.error, systemCopy.errors.load)}
+          onRetry={() => {
+            void food.refetch();
+          }}
+        />
+      ) : (
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs tracking-wide text-steel">{systemCopy.log.kcalLabel}</span>
+              <span className="font-display text-sm text-hunter" data-readout>
+                {totals.kcal} / {targets.kcal_min}–{targets.kcal_max}
+              </span>
+            </div>
+            <XpBar value={totals.kcal} max={targets.kcal_max} />
+            <span className={`font-display text-[0.6875rem] tracking-wider ${statusTone[status]}`}>
+              {statusCopy[status]}
             </span>
           </div>
-          <XpBar value={totals.kcal} max={targets.kcal_max} />
-          <span className={`font-display text-[0.6875rem] tracking-wider ${statusTone[status]}`}>
-            {statusCopy[status]}
-          </span>
-        </div>
 
-        <div className="flex flex-col gap-1">
-          <div className="flex items-baseline justify-between">
-            <span className="text-xs tracking-wide text-steel">{systemCopy.log.proteinLabel}</span>
-            <span className="font-display text-sm text-hunter" data-readout>
-              {totals.proteinG} / {targets.protein_target_g} g
-            </span>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs tracking-wide text-steel">
+                {systemCopy.log.proteinLabel}
+              </span>
+              <span className="font-display text-sm text-hunter" data-readout>
+                {totals.proteinG} / {targets.protein_target_g} g
+              </span>
+            </div>
+            <XpBar value={totals.proteinG} max={targets.protein_target_g} />
+            {proteinMet && (
+              <span className="font-display text-[0.6875rem] tracking-wider text-system-glow">
+                {systemCopy.log.proteinMet}
+              </span>
+            )}
           </div>
-          <XpBar value={totals.proteinG} max={targets.protein_target_g} />
-          {proteinMet && (
-            <span className="font-display text-[0.6875rem] tracking-wider text-system-glow">
-              {systemCopy.log.proteinMet}
-            </span>
-          )}
-        </div>
-      </section>
+        </section>
+      )}
 
-      {food.isPending ? (
+      {food.isError ? null : food.isPending ? (
         <SystemLoading />
       ) : food.data === undefined || food.data.length === 0 ? (
         <EmptyState message={systemCopy.empty.food} />

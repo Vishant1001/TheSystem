@@ -12,6 +12,7 @@ import '@fontsource/inter/latin-600.css';
 
 import './styles/app.css';
 import { App } from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/ToastProvider';
 import { AuthProvider } from './features/auth/AuthProvider';
 import { queryClient } from './lib/queryClient';
@@ -26,7 +27,9 @@ createRoot(rootElement).render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <ToastProvider>
-          <App />
+          <ErrorBoundary layout="screen">
+            <App />
+          </ErrorBoundary>
         </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>

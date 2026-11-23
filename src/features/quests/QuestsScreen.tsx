@@ -45,7 +45,7 @@ export function QuestsScreen() {
   }, [quests.data, completions.data, oneTimeCompletions.data, day, timezone]);
 
   const isPending = snapshot.isPending || quests.isPending || completions.isPending;
-  const error = snapshot.error ?? quests.error ?? completions.error;
+  const error = snapshot.error ?? quests.error ?? completions.error ?? oneTimeCompletions.error;
 
   if (isPending) return <SystemLoading />;
   if (error !== null || board === null) {
@@ -72,7 +72,8 @@ export function QuestsScreen() {
   function liveStatusFor(
     tracking: string,
   ): { text: string; tone: 'steel' | 'system' | 'penalty' } | undefined {
-    if (targets === undefined) return undefined;
+    // A failed food read must not render as "0 kcal": show nothing instead.
+    if (targets === undefined || food.isError) return undefined;
 
     if (tracking === 'auto_kcal_range') {
       const status = kcalStatus(totals.kcal, targets.kcal_min, targets.kcal_max);

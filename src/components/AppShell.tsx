@@ -1,8 +1,9 @@
-import { Outlet } from 'react-router';
+import { Outlet, useLocation } from 'react-router';
 import { systemCopy } from '../copy/system';
 import { LevelUpWatcher } from '../features/status/LevelUpModal';
 import { useDayClose } from '../features/report/useDayClose';
 import { BottomNav } from './BottomNav';
+import { ErrorBoundary } from './ErrorBoundary';
 import { SystemLoading } from './SystemStates';
 
 /** Mobile-first centered column with the System header and bottom nav. */
@@ -10,6 +11,7 @@ export function AppShell() {
   // ADR-7: every app load settles the days that passed while you were away,
   // before anything else is shown.
   const dayClose = useDayClose(true);
+  const { pathname } = useLocation();
   const settling = dayClose === 'idle' || dayClose === 'closing';
 
   return (
@@ -20,7 +22,15 @@ export function AppShell() {
         </span>
       </header>
       <main className="flex flex-1 flex-col gap-4">
-        {settling ? <SystemLoading message={systemCopy.report.closing} /> : <Outlet />}
+        {settling ? (
+          <SystemLoading message={systemCopy.report.closing} />
+        ) : (
+          // One broken screen must not take the navigation down with it; moving
+          // to another route clears the boundary.
+          <ErrorBoundary resetKey={pathname}>
+            <Outlet />
+          </ErrorBoundary>
+        )}
       </main>
       <LevelUpWatcher />
       <BottomNav />

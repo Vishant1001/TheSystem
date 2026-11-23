@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { systemCopy } from '../copy/system';
 import { STAT_IDS, type StatId } from '../game';
 
 /**
@@ -54,8 +55,8 @@ export type HunterSnapshot = z.infer<typeof hunterSnapshotSchema>;
 
 /** Credentials form (/auth). */
 export const credentialsSchema = z.object({
-  email: z.email('That is not an email address.'),
-  password: z.string().min(8, 'Use at least 8 characters.'),
+  email: z.email(systemCopy.validation.email),
+  password: z.string().min(8, systemCopy.validation.passwordLength),
 });
 
 export type Credentials = z.infer<typeof credentialsSchema>;
@@ -66,15 +67,26 @@ export const hunterProfileInputSchema = z
     hunterName: z
       .string()
       .trim()
-      .min(1, 'Choose a hunter name.')
-      .max(40, 'Keep it under 40 characters.'),
-    timezone: z.string().min(1, 'Choose a timezone.'),
-    kcalMin: z.coerce.number().int().min(500, 'That is too low.').max(10000, 'That is too high.'),
-    kcalMax: z.coerce.number().int().min(500, 'That is too low.').max(10000, 'That is too high.'),
-    proteinTargetG: z.coerce.number().min(1, 'Set a protein target.').max(500, 'That is too high.'),
+      .min(1, systemCopy.validation.hunterName)
+      .max(40, systemCopy.validation.hunterNameLength),
+    timezone: z.string().min(1, systemCopy.validation.timezone),
+    kcalMin: z.coerce
+      .number()
+      .int()
+      .min(500, systemCopy.validation.tooLow)
+      .max(10000, systemCopy.validation.tooHigh),
+    kcalMax: z.coerce
+      .number()
+      .int()
+      .min(500, systemCopy.validation.tooLow)
+      .max(10000, systemCopy.validation.tooHigh),
+    proteinTargetG: z.coerce
+      .number()
+      .min(1, systemCopy.validation.proteinTarget)
+      .max(500, systemCopy.validation.tooHigh),
   })
   .refine((value) => value.kcalMax >= value.kcalMin, {
-    message: 'The upper calorie bound must not be below the lower one.',
+    message: systemCopy.validation.kcalOrder,
     path: ['kcalMax'],
   });
 
@@ -107,16 +119,20 @@ export function toEngineSnapshot(snapshot: HunterSnapshot) {
 /** Custom quests (brief 7.2). Mirrors the check constraints on public.quests. */
 export const questInputSchema = z
   .object({
-    title: z.string().trim().min(1, 'Name the quest.').max(80, 'Keep it under 80 characters.'),
+    title: z
+      .string()
+      .trim()
+      .min(1, systemCopy.validation.questTitle)
+      .max(80, systemCopy.validation.questTitleLength),
     type: z.enum(['daily', 'one_time']),
     category: z.enum(['fitness', 'diet', 'life']),
     goalType: z.enum(['boolean', 'count', 'duration', 'numeric']),
-    targetValue: z.number().positive('Set a target above zero.').nullable(),
-    unit: z.string().trim().max(12, 'Keep the unit short.').nullable(),
+    targetValue: z.number().positive(systemCopy.validation.targetPositive).nullable(),
+    unit: z.string().trim().max(12, systemCopy.validation.unitLength).nullable(),
     statTags: z
       .array(z.enum(['STR', 'AGI', 'VIT', 'INT', 'SENSE']))
-      .min(1, 'Pick at least one stat.')
-      .max(2, 'Two stats at most.'),
+      .min(1, systemCopy.validation.statsMin)
+      .max(2, systemCopy.validation.statsMax),
     difficulty: z.enum(['E', 'D', 'C', 'B', 'A', 'S']),
     isCore: z.boolean(),
     scheduleDays: z.array(z.number().int().min(1).max(7)).nullable(),
@@ -127,20 +143,32 @@ export const questInputSchema = z
       value.type === 'daily' &&
       (value.scheduleDays === null || value.scheduleDays.length === 0)
     ) {
-      ctx.addIssue({ code: 'custom', path: ['scheduleDays'], message: 'Pick at least one day.' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['scheduleDays'],
+        message: systemCopy.validation.scheduleDays,
+      });
     }
     if (value.goalType !== 'boolean' && value.targetValue === null) {
-      ctx.addIssue({ code: 'custom', path: ['targetValue'], message: 'Set a target.' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['targetValue'],
+        message: systemCopy.validation.target,
+      });
     }
     if (value.type === 'one_time' && value.isCore && value.dueOn === null) {
       ctx.addIssue({
         code: 'custom',
         path: ['dueOn'],
-        message: 'A core one-time quest needs a due date.',
+        message: systemCopy.validation.coreNeedsDueDate,
       });
     }
     if (new Set(value.statTags).size !== value.statTags.length) {
-      ctx.addIssue({ code: 'custom', path: ['statTags'], message: 'Pick two different stats.' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['statTags'],
+        message: systemCopy.validation.statsDistinct,
+      });
     }
   });
 

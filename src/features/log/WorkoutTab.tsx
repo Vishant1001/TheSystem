@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { EmptyState } from '../../components/EmptyState';
 import { SystemButton } from '../../components/SystemButton';
 import { SystemField, SystemInput } from '../../components/SystemField';
-import { SystemLoading } from '../../components/SystemStates';
+import { SystemErrorPanel, SystemLoading } from '../../components/SystemStates';
 import { useToast } from '../../components/toastContext';
 import { systemCopy } from '../../copy/system';
 import {
@@ -101,6 +101,13 @@ export function WorkoutTab({ snapshot }: { snapshot: HunterSnapshot }) {
     <div className="flex flex-col gap-5">
       {workouts.isPending ? (
         <SystemLoading />
+      ) : workouts.isError ? (
+        <SystemErrorPanel
+          message={systemMessage(workouts.error, systemCopy.errors.load)}
+          onRetry={() => {
+            void workouts.refetch();
+          }}
+        />
       ) : workouts.data === undefined || workouts.data.length === 0 ? (
         <EmptyState message={systemCopy.empty.workouts} />
       ) : (
@@ -185,41 +192,47 @@ export function WorkoutTab({ snapshot }: { snapshot: HunterSnapshot }) {
             {systemCopy.log.sets}
           </legend>
           {sets.map((set, index) => (
+            // Sizes live on wrappers: an <input> has an intrinsic minimum
+            // width, so sizing the inputs directly let reps and kg crush the
+            // exercise field to a sliver at 375px.
             <div key={index} className="flex items-center gap-1.5">
-              <SystemInput
-                aria-label={`${systemCopy.log.exercise} ${index + 1}`}
-                placeholder={systemCopy.log.exercise}
-                className="flex-1"
-                value={set.exercise}
-                onChange={(event) => {
-                  updateSet(index, { exercise: event.target.value });
-                }}
-                disabled={busy}
-              />
-              <SystemInput
-                aria-label={`${systemCopy.log.reps} ${index + 1}`}
-                placeholder={systemCopy.log.reps}
-                type="number"
-                inputMode="numeric"
-                className="w-16"
-                value={set.reps}
-                onChange={(event) => {
-                  updateSet(index, { reps: event.target.value });
-                }}
-                disabled={busy}
-              />
-              <SystemInput
-                aria-label={`${systemCopy.log.weight} ${index + 1}`}
-                placeholder={systemCopy.log.weight}
-                type="number"
-                inputMode="decimal"
-                className="w-16"
-                value={set.weight}
-                onChange={(event) => {
-                  updateSet(index, { weight: event.target.value });
-                }}
-                disabled={busy}
-              />
+              <div className="min-w-0 flex-1">
+                <SystemInput
+                  aria-label={`${systemCopy.log.exercise} ${index + 1}`}
+                  placeholder={systemCopy.log.exercise}
+                  value={set.exercise}
+                  onChange={(event) => {
+                    updateSet(index, { exercise: event.target.value });
+                  }}
+                  disabled={busy}
+                />
+              </div>
+              <div className="w-16 shrink-0">
+                <SystemInput
+                  aria-label={`${systemCopy.log.reps} ${index + 1}`}
+                  placeholder={systemCopy.log.reps}
+                  type="number"
+                  inputMode="numeric"
+                  value={set.reps}
+                  onChange={(event) => {
+                    updateSet(index, { reps: event.target.value });
+                  }}
+                  disabled={busy}
+                />
+              </div>
+              <div className="w-16 shrink-0">
+                <SystemInput
+                  aria-label={`${systemCopy.log.weight} ${index + 1}`}
+                  placeholder={systemCopy.log.weight}
+                  type="number"
+                  inputMode="decimal"
+                  value={set.weight}
+                  onChange={(event) => {
+                    updateSet(index, { weight: event.target.value });
+                  }}
+                  disabled={busy}
+                />
+              </div>
               {sets.length > 1 && (
                 <SystemButton
                   tone="ghost"

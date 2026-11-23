@@ -83,6 +83,16 @@ export function QuestFormScreen({ mode }: QuestFormScreenProps) {
   }
 
   if (mode === 'edit' && quests.isPending) return <SystemLoading />;
+  if (mode === 'edit' && quests.isError) {
+    return (
+      <SystemErrorPanel
+        message={systemMessage(quests.error, systemCopy.errors.load)}
+        onRetry={() => {
+          void quests.refetch();
+        }}
+      />
+    );
+  }
   if (mode === 'edit' && existing === undefined) {
     return (
       <SystemErrorPanel
@@ -192,7 +202,7 @@ export function QuestFormScreen({ mode }: QuestFormScreenProps) {
   return (
     <SystemWindow
       title={systemCopy.windows.questDesigner}
-      headerAside={mode === 'edit' ? 'EDIT' : 'NEW'}
+      headerAside={mode === 'edit' ? systemCopy.quests.modeEdit : systemCopy.quests.modeNew}
     >
       <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
         <SystemField label={systemCopy.questForm.title} htmlFor="title" error={fieldErrors.title}>
@@ -429,7 +439,7 @@ export function QuestFormScreen({ mode }: QuestFormScreenProps) {
             }}
             disabled={pending}
           >
-            Back
+            {systemCopy.quests.back}
           </SystemButton>
 
           {mode === 'edit' && questId !== undefined && (

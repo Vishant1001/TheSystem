@@ -87,7 +87,7 @@ export function QuestCard({ view, pending, liveStatus, onComplete, onUndo }: Que
           to={`/quests/${quest.id}/edit`}
           className="shrink-0 font-display text-[0.625rem] tracking-widest text-steel uppercase hover:text-hunter"
         >
-          Edit
+          {systemCopy.quests.edit}
         </Link>
       </div>
 
