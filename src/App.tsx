@@ -5,6 +5,7 @@ import {
   RequireHunter,
   RequireNoHunter,
   RequireNoSession,
+  RequireReportAcknowledged,
   RequireSession,
 } from './components/guards';
 import { AuthScreen } from './features/auth/AuthScreen';
@@ -44,13 +45,17 @@ export function App() {
 
           <Route element={<RequireHunter />}>
             <Route element={<AppShell />}>
-              <Route index element={<StatusScreen />} />
-              <Route path="quests" element={<QuestsScreen />} />
-              <Route path="quests/new" element={<QuestFormScreen mode="create" />} />
-              <Route path="quests/:questId/edit" element={<QuestFormScreen mode="edit" />} />
-              <Route path="log" element={<LogScreen />} />
+              {/* The report itself is never gated, or it could not be read. */}
               <Route path="report" element={<ReportScreen />} />
-              <Route path="settings" element={<SettingsScreen />} />
+
+              <Route element={<RequireReportAcknowledged />}>
+                <Route index element={<StatusScreen />} />
+                <Route path="quests" element={<QuestsScreen />} />
+                <Route path="quests/new" element={<QuestFormScreen mode="create" />} />
+                <Route path="quests/:questId/edit" element={<QuestFormScreen mode="edit" />} />
+                <Route path="log" element={<LogScreen />} />
+                <Route path="settings" element={<SettingsScreen />} />
+              </Route>
             </Route>
           </Route>
         </Route>

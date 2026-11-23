@@ -1,10 +1,14 @@
+import { useState } from 'react';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { StatRow } from '../../components/StatRow';
+import { SystemButton } from '../../components/SystemButton';
 import { SystemLink } from '../../components/SystemLink';
 import { SystemErrorPanel, SystemLoading } from '../../components/SystemStates';
 import { SystemWindow } from '../../components/SystemWindow';
 import { XpBar } from '../../components/XpBar';
 import { systemCopy } from '../../copy/system';
-import { CATEGORIES, deriveHunterState, type Category } from '../../game';
+import { CATEGORIES, canAllocate, deriveHunterState, type Category, type StatId } from '../../game';
+import { useAllocatePoints } from '../../lib/mutations/stats';
 import { useHunterSnapshot } from '../../lib/queries/hunterSnapshot';
 import { toEngineSnapshot } from '../../lib/schemas';
 import { systemMessage } from '../../lib/systemError';
@@ -17,6 +21,8 @@ const categoryLabels: Record<Category, string> = {
 
 export function StatusScreen() {
   const { data, isPending, isError, error, refetch } = useHunterSnapshot();
+  const allocate = useAllocatePoints();
+  const [pendingStat, setPendingStat] = useState<StatId | null>(null);
 
   if (isPending) return <SystemLoading />;
   if (isError) {
@@ -80,7 +86,24 @@ export function StatusScreen() {
       >
         <ul className="flex flex-col divide-y divide-system/10">
           {state.stats.map((stat) => (
-            <StatRow key={stat.id} stat={stat} />
+            <StatRow
+              key={stat.id}
+              stat={stat}
+              action={
+                canAllocate(1, state.freePointsAvailable) ? (
+                  <SystemButton
+                    className="min-h-9 shrink-0 px-3 text-xs"
+                    aria-label={`${systemCopy.allocate.action} ${stat.id}`}
+                    disabled={allocate.isPending}
+                    onClick={() => {
+                      setPendingStat(stat.id);
+                    }}
+                  >
+                    +
+                  </SystemButton>
+                ) : undefined
+              }
+            />
           ))}
         </ul>
         {state.freePointsAvailable === 0 && (
@@ -109,6 +132,34 @@ export function StatusScreen() {
           })}
         </ul>
       </SystemWindow>
+
+      <ConfirmDialog
+        open={pendingStat !== null}
+        title={systemCopy.allocate.confirmTitle}
+        detail={
+          pendingStat === null ? undefined : `${systemCopy.allocate.confirmTo} ${pendingStat}`
+        }
+        body={`${systemCopy.allocate.confirmBody} ${String(state.freePointsAvailable - 1)} ${systemCopy.allocate.remaining}.`}
+        confirmLabel={
+          allocate.isPending ? systemCopy.allocate.working : systemCopy.allocate.confirm
+        }
+        cancelLabel={systemCopy.allocate.cancel}
+        pending={allocate.isPending}
+        onCancel={() => {
+          setPendingStat(null);
+        }}
+        onConfirm={() => {
+          if (pendingStat === null) return;
+          allocate.mutate(
+            { stat: pendingStat, points: 1 },
+            {
+              onSettled: () => {
+                setPendingStat(null);
+              },
+            },
+          );
+        }}
+      />
 
       <div className="flex justify-center pb-2">
         <SystemLink to="/settings" tone="ghost">

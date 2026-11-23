@@ -19,7 +19,10 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "icons": "pwa-assets-generator",
-    "gen:sql": "node scripts/gen-sql-artifacts.mjs"
+    "gen:sql": "node scripts/gen-sql-artifacts.mjs",
+    "db:sql": "node scripts/local-sql.mjs",
+    "db:verify": "node scripts/local-sql.mjs supabase/tests/game_date_parity.sql supabase/tests/quest_schedule_parity.sql supabase/tests/rls_proof.sql supabase/tests/smoke_game_rules.sql",
+    "sim:days": "node scripts/local-sql.mjs supabase/dev/simulate_days.sql"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

@@ -73,32 +73,31 @@ run, and nothing in this repo runs it for you.
 
 ## Verifying after you apply
 
-All three scripts are plain SQL with no psql meta-commands, so each one can
-equally be pasted whole into the Supabase dashboard SQL editor. With a local
-stack running, psql is quicker:
+With the local stack running, one command runs all four:
 
 ```powershell
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f supabase/tests/rls_proof.sql
+npm run db:verify
 ```
 
-```powershell
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f supabase/tests/smoke_game_rules.sql
-```
+`scripts/local-sql.mjs` pipes each file into the local stack's own database
+container and runs it with the psql inside — no psql on your machine, no
+connection URL, and it works in PowerShell (which has no `<` redirection). Run
+a single file with `npm run db:sql -- supabase/tests/rls_proof.sql`.
 
-```powershell
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f supabase/tests/game_date_parity.sql
-```
-
+- `game_date_parity.sql` — **generated.** The same day-rollover vectors the
+  TypeScript engine is tested against, so SQL and engine cannot disagree (C5).
+- `quest_schedule_parity.sql` — **generated.** The same scheduling vectors the
+  engine's `schedule.ts` is tested against.
 - `rls_proof.sql` — hunter A cannot read or write hunter B, the ledger rejects
   client writes, anonymous callers get nothing. Prints `RLS PROOF PASSED`.
 - `smoke_game_rules.sql` — the game rules end to end: rewards, undo, auto
-  quests, daily caps, late one-time quests, sealed days, day close, report.
-  Prints `SMOKE TEST PASSED`.
-- `game_date_parity.sql` — **generated.** The same day-rollover vectors the
-  TypeScript engine is tested against, so SQL and engine cannot disagree (C5).
+  quests, daily caps, late one-time quests, sealed days, day close, report,
+  timezone changes. Prints `SMOKE TEST PASSED`.
 
-All three run inside a transaction and end with `ROLLBACK`. They create
+The test scripts run inside a transaction and end with `ROLLBACK`. They create
 throwaway `auth.users` rows, so run them against a local or test database.
+They are plain SQL, so each can also be pasted whole into the dashboard SQL
+editor of a test project.
 
 ## Security model (ADR-3, C1)
 
@@ -166,3 +165,49 @@ timezone west can never reopen a day that has already been sealed.
 `close_days()` has a clearly marked no-op section between writing the day log
 and advancing `last_closed_on`. Phase 2 inserts the penalty step there; nothing
 above or below it needs rewriting (brief 6.4 step 5).
+
+## Simulating days (dev only)
+
+`dev/simulate_days.sql` winds a hunter back so `close_days()` has real days to
+settle and the System Report has something to say.
+
+```powershell
+npm run sim:days
+```
+
+By default it lives four days back: two fully lived (cleared, one free point
+each), one untouched (failed) and one with food only (failed). Open the app
+afterwards — the day close runs on load, the report appears, and a level-up
+crossed during the close raises the modal over it.
+
+Override the scenario (quote the arrays, or PowerShell reads the braces):
+
+```powershell
+npm run sim:days -- --set sim.days_back=9 --set 'sim.lived={9,8,7}' --set 'sim.food_only={}'
+```
+
+Unlike the test scripts it does **not** roll back, and it deletes the ledger
+rows inside its own window so a re-run starts clean. Only a dev script may do
+that: the app never erases history, it appends reversals (ADR-1).
+
+### Why it can never touch the hosted project
+
+It rewrites history, so it is isolated three ways:
+
+1. **Not in the app.** It is a SQL file under `supabase/dev/`. Nothing in `src/`
+   references it and none of its identifiers appear in the production bundle.
+2. **No URL to point anywhere.** `npm run sim:days` pipes it into the local
+   stack's own database container. The runner only accepts `sim.*` settings
+   with integer values, so it cannot be used to spoof the checks below.
+3. **The SQL refuses on its own**, before writing anything, even if someone
+   runs it by hand against the wrong database:
+   - any **network** session is refused — it only runs over the local
+     container's unix socket, and the hosted project is reachable only over
+     the network;
+   - any database without the **local stack's identity** is refused — the
+     Supabase CLI sets `app.settings.jwt_secret` to its public demo value
+     locally, which no hosted project uses (compared by hash, so the literal
+     is not committed).
+
+   Both must pass. If a future CLI drops either signal, the script refuses
+   even locally — the safe way to fail.

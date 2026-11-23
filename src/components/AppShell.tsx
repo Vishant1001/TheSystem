@@ -1,9 +1,17 @@
 import { Outlet } from 'react-router';
 import { systemCopy } from '../copy/system';
+import { LevelUpWatcher } from '../features/status/LevelUpModal';
+import { useDayClose } from '../features/report/useDayClose';
 import { BottomNav } from './BottomNav';
+import { SystemLoading } from './SystemStates';
 
 /** Mobile-first centered column with the System header and bottom nav. */
 export function AppShell() {
+  // ADR-7: every app load settles the days that passed while you were away,
+  // before anything else is shown.
+  const dayClose = useDayClose(true);
+  const settling = dayClose === 'idle' || dayClose === 'closing';
+
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pt-safe pb-28">
       <header className="mb-4 flex items-baseline justify-between">
@@ -12,8 +20,9 @@ export function AppShell() {
         </span>
       </header>
       <main className="flex flex-1 flex-col gap-4">
-        <Outlet />
+        {settling ? <SystemLoading message={systemCopy.report.closing} /> : <Outlet />}
       </main>
+      <LevelUpWatcher />
       <BottomNav />
     </div>
   );

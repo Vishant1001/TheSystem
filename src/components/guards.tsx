@@ -88,3 +88,17 @@ export function RequireNoHunter() {
   if (data !== null) return <Navigate to="/" replace />;
   return <Outlet />;
 }
+
+/**
+ * Brief 7.2: the System Report is shown automatically once there are closed
+ * days to acknowledge. Driven by the snapshot rather than by what close_days()
+ * happened to return, so a refresh mid-report still lands here (G9).
+ */
+export function RequireReportAcknowledged() {
+  const { data } = useHunterSnapshot();
+
+  if (data !== null && data !== undefined && data.unacknowledged_days > 0) {
+    return <Navigate to="/report" replace />;
+  }
+  return <Outlet />;
+}
