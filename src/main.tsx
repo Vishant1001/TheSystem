@@ -12,6 +12,7 @@ import '@fontsource/inter/latin-600.css';
 
 import './styles/app.css';
 import { App } from './App';
+import { ToastProvider } from './components/ToastProvider';
 import { AuthProvider } from './features/auth/AuthProvider';
 import { queryClient } from './lib/queryClient';
 
@@ -24,7 +25,9 @@ createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <App />
+        <ToastProvider>
+          <App />
+        </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>
   </StrictMode>,

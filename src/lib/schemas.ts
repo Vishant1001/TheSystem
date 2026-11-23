@@ -103,3 +103,45 @@ export function toEngineSnapshot(snapshot: HunterSnapshot) {
     allocatedPoints,
   };
 }
+
+/** Custom quests (brief 7.2). Mirrors the check constraints on public.quests. */
+export const questInputSchema = z
+  .object({
+    title: z.string().trim().min(1, 'Name the quest.').max(80, 'Keep it under 80 characters.'),
+    type: z.enum(['daily', 'one_time']),
+    category: z.enum(['fitness', 'diet', 'life']),
+    goalType: z.enum(['boolean', 'count', 'duration', 'numeric']),
+    targetValue: z.number().positive('Set a target above zero.').nullable(),
+    unit: z.string().trim().max(12, 'Keep the unit short.').nullable(),
+    statTags: z
+      .array(z.enum(['STR', 'AGI', 'VIT', 'INT', 'SENSE']))
+      .min(1, 'Pick at least one stat.')
+      .max(2, 'Two stats at most.'),
+    difficulty: z.enum(['E', 'D', 'C', 'B', 'A', 'S']),
+    isCore: z.boolean(),
+    scheduleDays: z.array(z.number().int().min(1).max(7)).nullable(),
+    dueOn: z.string().nullable(),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      value.type === 'daily' &&
+      (value.scheduleDays === null || value.scheduleDays.length === 0)
+    ) {
+      ctx.addIssue({ code: 'custom', path: ['scheduleDays'], message: 'Pick at least one day.' });
+    }
+    if (value.goalType !== 'boolean' && value.targetValue === null) {
+      ctx.addIssue({ code: 'custom', path: ['targetValue'], message: 'Set a target.' });
+    }
+    if (value.type === 'one_time' && value.isCore && value.dueOn === null) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['dueOn'],
+        message: 'A core one-time quest needs a due date.',
+      });
+    }
+    if (new Set(value.statTags).size !== value.statTags.length) {
+      ctx.addIssue({ code: 'custom', path: ['statTags'], message: 'Pick two different stats.' });
+    }
+  });
+
+export type QuestInput = z.infer<typeof questInputSchema>;

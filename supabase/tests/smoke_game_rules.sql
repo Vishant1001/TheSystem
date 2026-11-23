@@ -32,6 +32,8 @@ declare
   v_count integer;
   v_day date;
   v_days jsonb;
+  v_last_closed date;
+  v_timezone text;
 begin
   perform set_config(
     'request.jwt.claims',
@@ -379,6 +381,57 @@ begin
   end if;
 
   raise notice 'I. report and snapshot: report clears on acknowledge, allocation lands';
+
+  -- =========================================================================
+  -- J. Timezone changes (C4 immediacy, C7 clamp, G12 validation)
+  -- =========================================================================
+  select last_closed_on into v_last_closed from public.hunters where user_id = v_user;
+  if v_last_closed is null then
+    raise exception 'J: expected sealed days left over from section H';
+  end if;
+
+  -- Moving east applies at once: the profile changes the moment it is saved.
+  perform public.update_hunter_profile('Smoke Hunter', 'Pacific/Kiritimati', 1700, 1900, 120);
+  select timezone into v_timezone from public.hunters where user_id = v_user;
+  if v_timezone <> 'Pacific/Kiritimati' then
+    raise exception 'J: the timezone did not apply immediately, hunters still says %', v_timezone;
+  end if;
+  if public.game_today() <= v_last_closed then
+    raise exception 'J: game_today % fell inside sealed history (last closed %)',
+      public.game_today(), v_last_closed;
+  end if;
+
+  -- Moving west can drag the raw local date backwards; the clamp must hold.
+  perform public.update_hunter_profile('Smoke Hunter', 'Pacific/Midway', 1700, 1900, 120);
+  if public.game_today() <= v_last_closed then
+    raise exception 'J: moving west reopened a sealed day: game_today %, last closed %',
+      public.game_today(), v_last_closed;
+  end if;
+  if public.game_today() < public.game_date_at(now(), 'Pacific/Midway') then
+    raise exception 'J: the clamp must never move the game day backwards';
+  end if;
+
+  -- Deterministic C7 check: seal days beyond the clock and confirm the pin.
+  update public.hunters set last_closed_on = v_today + 2 where user_id = v_user;
+  if public.game_today() <> v_today + 3 then
+    raise exception 'J: clamp should pin the game day to last_closed_on + 1, got %',
+      public.game_today();
+  end if;
+  update public.hunters set last_closed_on = v_last_closed where user_id = v_user;
+
+  -- G12: a timezone Postgres does not know is refused outright.
+  begin
+    perform public.update_hunter_profile('Smoke Hunter', 'Mars/Olympus', 1700, 1900, 120);
+    raise exception 'J: an unknown timezone must be refused';
+  exception when others then
+    if sqlerrm not like 'INVALID_TIMEZONE%' then
+      raise exception 'J: unexpected error for an unknown timezone: %', sqlerrm;
+    end if;
+  end;
+
+  perform public.update_hunter_profile('Smoke Hunter', 'Europe/Berlin', 1700, 1900, 120);
+
+  raise notice 'J. timezone: immediate, clamped out of sealed days, validated';
 
   raise notice '-------------------------------';
   raise notice 'SMOKE TEST PASSED';
