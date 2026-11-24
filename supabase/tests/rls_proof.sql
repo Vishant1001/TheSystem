@@ -43,6 +43,13 @@ select public.onboard_hunter('Hunter B', 'Europe/Berlin', 2200, 2400, 160);
 select public.log_food('B protein shake', 300, 60);
 select public.log_workout('B session', null, '[{"exercise_name":"Squat","reps":5,"weight_kg":100}]'::jsonb);
 select public.allocate_points('STR', 1);
+select public.start_safe_period('travel', 2);
+select public.update_hunter_rules('lenient', array[6, 7]::smallint[]);
+
+-- A stone for B. Only close_days() earns one, so the setup writes it as owner.
+reset role;
+insert into public.redemption_stone_events (user_id, occurred_on, delta, reason, log_date)
+values ('22222222-2222-2222-2222-222222222222', current_date, 1, 'earned', current_date);
 
 -- ---------------------------------------------------------------------------
 -- Act as A and try to see or touch B.
@@ -90,6 +97,12 @@ begin
 
   select count(*) into v_count from public.daily_logs where user_id = v_user_b;
   if v_count <> 0 then v_leaks := v_leaks || 'daily_logs '; end if;
+
+  select count(*) into v_count from public.safe_periods where user_id = v_user_b;
+  if v_count <> 0 then v_leaks := v_leaks || 'safe_periods '; end if;
+
+  select count(*) into v_count from public.redemption_stone_events where user_id = v_user_b;
+  if v_count <> 0 then v_leaks := v_leaks || 'redemption_stone_events '; end if;
 
   if v_leaks <> '' then
     raise exception 'RLS LEAK: hunter A can read hunter B rows in: %', v_leaks;
@@ -192,6 +205,30 @@ begin
     raise exception 'SECURITY FAILURE: client created an auto-tracked quest';
   end if;
 
+  -- 4b. Phase 2 tables are written only by RPCs: no direct writes at all.
+  foreach v_statement in array array[
+    format('insert into public.safe_periods (user_id, kind, start_on, end_on) values (%L, ''sick'', current_date, current_date)', v_user_a),
+    'update public.safe_periods set end_on = end_on + 30',
+    'delete from public.safe_periods',
+    format('insert into public.redemption_stone_events (user_id, occurred_on, delta, reason, log_date) values (%L, current_date, 1, ''earned'', current_date)', v_user_a),
+    'update public.redemption_stone_events set delta = 1',
+    'delete from public.redemption_stone_events',
+    'update public.hunter_target_history set penalty_mode = ''lenient''',
+    'update public.daily_logs set status = ''cleared'', streak = 99',
+    'update public.hunters set rules_from = current_date + 365'
+  ]
+  loop
+    v_blocked := false;
+    begin
+      execute v_statement;
+    exception when insufficient_privilege then
+      v_blocked := true;
+    end;
+    if not v_blocked then
+      raise exception 'SECURITY FAILURE: client ran a direct write: %', v_statement;
+    end if;
+  end loop;
+
   -- 5. A cannot complete one of B's quests, even knowing its id.
   --    Role switches go through EXECUTE so plpgsql runs them as utility
   --    statements rather than trying to plan them.
@@ -212,6 +249,20 @@ begin
   end;
   if not v_blocked then
     raise exception 'SECURITY FAILURE: hunter A completed a quest owned by B';
+  end if;
+
+  -- 5b. A cannot end B's safe period, even knowing its id.
+  execute 'reset role';
+  select id into v_quest_b from public.safe_periods where user_id = v_user_b limit 1;
+  execute 'set local role authenticated';
+  v_blocked := false;
+  begin
+    perform public.end_safe_period(v_quest_b);
+  exception when others then
+    v_blocked := sqlerrm like 'SAFE_PERIOD_NOT_FOUND%';
+  end;
+  if not v_blocked then
+    raise exception 'SECURITY FAILURE: hunter A could end a safe period owned by B';
   end if;
 
   -- 6. No internal helper is reachable from a client role.
@@ -237,7 +288,21 @@ begin
     'select public.quest_xp_for(''S'')',
     'select public.daily_cap_for(''life'')',
     'select public.is_valid_timezone(''UTC'')',
-    'select public.assert_authenticated()'
+    'select public.assert_authenticated()',
+    'select public.weekdays_are_distinct(array[1]::smallint[])',
+    'select public.effective_rules(''22222222-2222-2222-2222-222222222222''::uuid, current_date)',
+    'select public.counts_toward_core_tally(true, false, true, false)',
+    'select public.day_outcome(true, false, false, 1, 1)',
+    'select public.next_streak(1, ''extend'')',
+    'select public.earns_stone(6, 7, 0, ''standard'')',
+    'select public.stones_held(''22222222-2222-2222-2222-222222222222''::uuid)',
+    'select public.safe_effective_end(current_date, null)',
+    'select public.is_safe_on(''22222222-2222-2222-2222-222222222222''::uuid, current_date)',
+    'select public.safe_period_start(now(), ''UTC'', ''standard'')',
+    'select public.safe_period_refusal(''{}''::date[], ''{}''::date[], ''{}''::date[], current_date, 1)',
+    'select public.safe_period_refusal_for(''22222222-2222-2222-2222-222222222222''::uuid, current_date, 1)',
+    'select public.safe_days_bookable(''22222222-2222-2222-2222-222222222222''::uuid, current_date)',
+    'select public.safe_start_for(''22222222-2222-2222-2222-222222222222''::uuid)'
   ]
   loop
     v_blocked := false;
@@ -333,7 +398,10 @@ begin
     'select public.game_today()',
     'select public.close_days()',
     'select public.onboard_hunter(''X'', ''UTC'', 1700, 1900, 120)',
-    'select public.log_food(''X'', 1, 1)'
+    'select public.log_food(''X'', 1, 1)',
+    'select public.start_safe_period(''sick'', 1)',
+    'select public.end_safe_period(gen_random_uuid())',
+    'select public.update_hunter_rules(''lenient'', ''{}''::smallint[])'
   ]
   loop
     v_blocked := false;
@@ -352,6 +420,66 @@ end;
 $$;
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Exhaustive privilege check, straight from the catalog: every function in
+-- public, for both client roles. A new function that forgets its revoke fails
+-- here even if nobody adds it to a list above.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_client_rpcs text[] := array[
+    'acknowledge_report', 'allocate_points', 'close_days', 'complete_quest',
+    'delete_food', 'delete_workout', 'end_safe_period', 'game_today', 'hunter_snapshot',
+    'log_food', 'log_workout', 'onboard_hunter', 'pending_report', 'start_safe_period',
+    'undo_completion', 'update_hunter_profile', 'update_hunter_rules'
+  ];
+  -- A trigger function cannot be called directly, whatever its grant says.
+  v_trigger_functions text[] := array['quests_guard_immutable'];
+  v_extra text;
+  v_missing text;
+  v_anon text;
+  v_total integer;
+begin
+  select string_agg(p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')', ', ')
+  into v_extra
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and has_function_privilege('authenticated', p.oid, 'execute')
+    and not (p.proname = any (v_client_rpcs || v_trigger_functions));
+  if v_extra is not null then
+    raise exception 'SECURITY FAILURE: authenticated can execute internal functions: %', v_extra;
+  end if;
+
+  select string_agg(rpc, ', ')
+  into v_missing
+  from unnest(v_client_rpcs) as rpc
+  where not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = rpc
+      and has_function_privilege('authenticated', p.oid, 'execute'));
+  if v_missing is not null then
+    raise exception 'authenticated is missing execute on RPCs: %', v_missing;
+  end if;
+
+  select string_agg(p.proname, ', ')
+  into v_anon
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and has_function_privilege('anon', p.oid, 'execute')
+    and not (p.proname = any (v_trigger_functions));
+  if v_anon is not null then
+    raise exception 'SECURITY FAILURE: anon can execute: %', v_anon;
+  end if;
+
+  select count(*) into v_total
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public';
+
+  raise notice 'privileges: % public functions checked, authenticated runs exactly % RPCs, anon none',
+    v_total, cardinality(v_client_rpcs);
+end;
+$$;
 
 do $$
 begin

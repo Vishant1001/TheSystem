@@ -17,9 +17,10 @@ expected_tables(name) as (
   values
     ('hunters'), ('hunter_target_history'), ('quests'), ('quest_completions'),
     ('food_entries'), ('workouts'), ('workout_sets'), ('xp_events'),
-    ('stat_allocations'), ('daily_logs'), ('game_config')
+    ('stat_allocations'), ('daily_logs'), ('game_config'),
+    ('safe_periods'), ('redemption_stone_events')
 ),
--- The client surface: the 14 RPCs, plus the quests trigger function, which can
+-- The client surface: the 17 RPCs, plus the quests trigger function, which can
 -- only ever run as a trigger.
 expected_client_functions(name) as (
   values
@@ -27,18 +28,20 @@ expected_client_functions(name) as (
     ('delete_food'), ('delete_workout'), ('game_today'), ('hunter_snapshot'),
     ('log_food'), ('log_workout'), ('onboard_hunter'), ('pending_report'),
     ('undo_completion'), ('update_hunter_profile'),
+    ('start_safe_period'), ('end_safe_period'), ('update_hunter_rules'),
     ('quests_guard_immutable')
 ),
 expected_config_keys(key) as (
   values
     ('version'), ('game_day_start_hour'), ('quest_xp_by_difficulty'), ('daily_caps'),
     ('stat_xp_divisor'), ('min_stat_xp_per_tag'), ('free_points_per_daily_clear'),
-    ('close_days_max_backfill')
+    ('close_days_max_backfill'), ('level_curve'), ('stat_order'), ('award_sources'),
+    ('penalty'), ('stones'), ('safe_zones'), ('gym')
 ),
 -- Objects created by the last migration; their presence means every migration
 -- before it ran too.
 latest_migration_functions(name) as (
-  values ('quest_scheduled_on'), ('quest_on_board'), ('quest_overdue_on')
+  values ('day_outcome'), ('safe_period_refusal'), ('update_hunter_rules')
 ),
 
 -- ---------------------------------------------------------------------------
@@ -83,7 +86,7 @@ grant_violations as (
 
 checks(ord, check_name, passed, detail) as (
   -- 1 -----------------------------------------------------------------------
-  select 1, 'All 11 tables exist',
+  select 1, 'All 13 tables exist',
     not exists (select 1 from expected_tables e where e.name not in (select name from public_tables)),
     coalesce(
       'missing: ' || (select string_agg(e.name, ', ') from expected_tables e
@@ -132,7 +135,7 @@ checks(ord, check_name, passed, detail) as (
 
   -- 5 -----------------------------------------------------------------------
   union all
-  select 5, 'authenticated can EXECUTE exactly the 14 RPCs + trigger function',
+  select 5, 'authenticated can EXECUTE exactly the 17 RPCs + trigger function',
     not exists (select name from expected_client_functions
                 except select name from authenticated_can_execute)
     and not exists (select name from authenticated_can_execute
@@ -206,7 +209,13 @@ checks(ord, check_name, passed, detail) as (
       'missing: ' || (select string_agg(name, ', ') from (
         select name from latest_migration_functions
         except select name from public_functions) l),
-      'quest scheduling predicate present (migration 20261122000900)')
+      'Safe Zones functions present (migration 20261123000300)')
+
+  -- 12 ----------------------------------------------------------------------
+  union all
+  select 12, 'Every hunter has a rules epoch (Phase 2 rules start date)',
+    not exists (select 1 from public.hunters where rules_from is null),
+    format('%s hunters, all with rules_from', (select count(*) from public.hunters))
 )
 
 select check_name, case when passed then 'PASS' else 'FAIL' end as status, detail

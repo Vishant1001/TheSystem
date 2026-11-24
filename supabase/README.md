@@ -5,19 +5,25 @@ any database — applying is your call.
 
 ## Migrations, in order
 
-| File                                      | What it does                                                               |
-| ----------------------------------------- | -------------------------------------------------------------------------- |
-| `20261122000100_init_schema.sql`          | Tables, check constraints, indexes                                         |
-| `20261122000200_rls.sql`                  | RLS on every table, table grants, owner-only policies                      |
-| `20261122000300_game_config.sql`          | **Generated.** Seeds `game_config` from `src/game/game-config.json`        |
-| `20261122000400_functions_core.sql`       | Config readers, game dates, award maths, ledger writers, `hunter_snapshot` |
-| `20261122000500_functions_quests.sql`     | `complete_quest`, `undo_completion`, `allocate_points`                     |
-| `20261122000600_functions_logging.sql`    | Food and workout logging, auto-quest evaluation                            |
-| `20261122000700_functions_close_days.sql` | `close_days`, `pending_report`, `acknowledge_report`                       |
-| `20261122000800_functions_onboarding.sql` | `onboard_hunter`, `update_hunter_profile`                                  |
+| File                                          | What it does                                                                       |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `20261122000100_init_schema.sql`              | Tables, check constraints, indexes                                                 |
+| `20261122000200_rls.sql`                      | RLS on every table, table grants, owner-only policies                              |
+| `20261122000300_game_config.sql`              | **Generated.** Seeds `game_config` from `src/game/game-config.json`                |
+| `20261122000400_functions_core.sql`           | Config readers, game dates, award maths, ledger writers, `hunter_snapshot`         |
+| `20261122000500_functions_quests.sql`         | `complete_quest`, `undo_completion`, `allocate_points`                             |
+| `20261122000600_functions_logging.sql`        | Food and workout logging, auto-quest evaluation                                    |
+| `20261122000700_functions_close_days.sql`     | `close_days`, `pending_report`, `acknowledge_report`                               |
+| `20261122000800_functions_onboarding.sql`     | `onboard_hunter`, `update_hunter_profile`                                          |
+| `20261122000900_quest_schedule_predicate.sql` | Shared quest scheduling predicate used by `close_days`                             |
+| `20261123000100_game_config_v2.sql`           | **Generated.** Phase 2 config seed (supersedes the Phase 1 seed by upsert)         |
+| `20261123000200_safe_zones_schema.sql`        | Rules epoch, versioned rules, `on_rest_days`, `safe_periods`, stones, day statuses |
+| `20261123000300_safe_zones_functions.sql`     | Rest/safe/streak/stone logic, Safe Zone RPCs, new `close_days`                     |
 
-Never edit `20261122000300_game_config.sql` by hand. Change
-`src/game/game-config.json`, then run `npm run gen:sql`. A Vitest test parses
+Never edit a generated config migration by hand. Change
+`src/game/game-config.json`, then run `npm run gen:sql`. The newest config
+migration (`20261123000100_game_config_v2.sql`) is the generated one; the
+Phase 1 seed is already applied on hosted and stays frozen (forward-only). A Vitest test parses
 the generated file and fails if the two drift (ADR-4).
 
 ## Setting up the hosted project
@@ -73,7 +79,7 @@ yours to run, and nothing in this repo runs it for you. Then run
 
 ## Verifying after you apply
 
-With the local stack running, one command runs all four:
+With the local stack running, one command runs all of them:
 
 ```powershell
 npm run db:verify
@@ -88,11 +94,16 @@ a single file with `npm run db:sql -- supabase/tests/rls_proof.sql`.
   TypeScript engine is tested against, so SQL and engine cannot disagree (C5).
 - `quest_schedule_parity.sql` — **generated.** The same scheduling vectors the
   engine's `schedule.ts` is tested against.
+- `safe_zone_parity.sql` — **generated.** Day outcome, streak and stone,
+  safe period start and quota vectors, shared with the engine tests.
 - `rls_proof.sql` — hunter A cannot read or write hunter B, the ledger rejects
   client writes, anonymous callers get nothing. Prints `RLS PROOF PASSED`.
 - `smoke_game_rules.sql` — the game rules end to end: rewards, undo, auto
   quests, daily caps, late one-time quests, sealed days, day close, report,
   timezone changes. Prints `SMOKE TEST PASSED`.
+- `smoke_safe_zones.sql` — 45 simulated days (rest, safe, cleared, failed,
+  the epoch, a rules change), stones at streak 7/14/21 and none past 3,
+  versioned rules and the Safe Zone RPCs. Prints `SAFE ZONES PASSED`.
 
 The test scripts run inside a transaction and end with `ROLLBACK`. They create
 throwaway `auth.users` rows, so run them against a local or test database.
@@ -118,7 +129,8 @@ public`, asserts `auth.uid()` and scopes every statement to that uid. A
 > every new function in `public` to `anon` and `authenticated` **by name**, so
 > `revoke ... from public` does _not_ take it away. Always revoke from
 > `public, anon, authenticated` and then grant back only what the client needs.
-> `rls_proof.sql` checks every helper and will fail if one is left reachable.
+> `rls_proof.sql` checks every function in `public` straight from the catalog
+> against the explicit RPC list, so a forgotten revoke fails it.
 
 ## RPC reference
 
@@ -148,6 +160,9 @@ short stable tokens — the client maps them to System copy, never shows them ra
 | `allocate_points(stat, points)`                                               | Appends a permanent allocation. Availability is checked client-side by the engine (ADR-5).                                                                                                                                                                                       | `UNKNOWN_STAT_TAG`, `POINTS_MUST_BE_POSITIVE`, `HUNTER_NOT_FOUND`                                                                                                                 |
 | `close_days()`                                                                | Closes every unclosed game day before today: settles the deferred calorie quest, tallies core quests, writes `daily_logs`, awards the daily clear, advances `last_closed_on`. Idempotent, locks the hunter row, closes at most 30 days per call and reports `more_pending` (G8). | `HUNTER_NOT_FOUND`                                                                                                                                                                |
 | `acknowledge_report()`                                                        | Marks every unacknowledged closed day as seen (G9).                                                                                                                                                                                                                              | —                                                                                                                                                                                 |
+| `update_hunter_rules(penalty_mode, rest_days)`                                | Penalty mode and 0–2 rest weekdays, versioned from the next game day; diet targets carried forward.                                                                                                                                                                              | `HUNTER_NOT_FOUND`, `INVALID_PENALTY_MODE`, `INVALID_REST_DAYS`                                                                                                                   |
+| `start_safe_period(kind, days)`                                               | Sick/Travel for 1–7 days. Starts today if called before today's warning time, otherwise tomorrow (never before the rules epoch). Max 10 safe days in any rolling 30.                                                                                                             | `HUNTER_NOT_FOUND`, `INVALID_SAFE_KIND`, `SAFE_PERIOD_LENGTH`, `SAFE_PERIOD_OVERLAP`, `SAFE_QUOTA_EXCEEDED`                                                                       |
+| `end_safe_period(id)`                                                         | Ends a period from the next game day (a period not yet started is cancelled); unused days return to the quota.                                                                                                                                                                   | `SAFE_PERIOD_NOT_FOUND`, `SAFE_PERIOD_NOT_ACTIVE`                                                                                                                                 |
 
 ### Day boundaries (C5, C7)
 
@@ -159,6 +174,21 @@ engine reads, and `game_date_at()` mirrors `gameDateAt()` in
 
 `game_today()` is additionally clamped to `last_closed_on + 1`, so moving the
 timezone west can never reopen a day that has already been sealed.
+
+### Safe Zones (Phase 2)
+
+- **Rules epoch.** `hunters.rules_from` is the first game day judged by Phase 2
+  rules. Existing hunters got the day after their game day at migration time;
+  new hunters get their first day. Earlier days keep Phase 1 rules, closed or
+  not, so nothing is re-evaluated retroactively.
+- **Day status** precedence is `safe > rest > cleared/failed`. A rest day
+  tallies only core quests with `on_rest_days`; with none it is `rest`, and it
+  never fails. Safe days pay nothing and leave the streak alone.
+- **Streak** (`daily_logs.streak`): counted clears extend it, a failure resets
+  it, rest/safe/zero-core days hold it. Every 7th earns a Redemption Stone in
+  the append-only `redemption_stone_events` (max 3 held, none in Hardcore).
+- `hunter_snapshot().safe_zones` carries today's and tomorrow's rules, the
+  streak, stones held, current and upcoming safe periods and the bookable days.
 
 ### The Penalty Zone hook
 

@@ -31,6 +31,7 @@ export type Database = {
           core_total: number;
           log_date: string;
           status: string;
+          streak: number;
           user_id: string;
         };
         ComputedFields: never;
@@ -41,6 +42,7 @@ export type Database = {
           core_total?: number;
           log_date: string;
           status: string;
+          streak?: number;
           user_id: string;
         };
         Update: {
@@ -50,6 +52,7 @@ export type Database = {
           core_total?: number;
           log_date?: string;
           status?: string;
+          streak?: number;
           user_id?: string;
         };
         Relationships: [];
@@ -110,7 +113,9 @@ export type Database = {
           effective_on: string;
           kcal_max: number;
           kcal_min: number;
+          penalty_mode: string;
           protein_target_g: number;
+          rest_days: number[];
           user_id: string;
         };
         ComputedFields: never;
@@ -119,7 +124,9 @@ export type Database = {
           effective_on: string;
           kcal_max: number;
           kcal_min: number;
+          penalty_mode: string;
           protein_target_g: number;
+          rest_days: number[];
           user_id: string;
         };
         Update: {
@@ -127,7 +134,9 @@ export type Database = {
           effective_on?: string;
           kcal_max?: number;
           kcal_min?: number;
+          penalty_mode?: string;
           protein_target_g?: number;
+          rest_days?: number[];
           user_id?: string;
         };
         Relationships: [];
@@ -141,6 +150,7 @@ export type Database = {
           kcal_min: number;
           last_closed_on: string | null;
           protein_target_g: number;
+          rules_from: string;
           timezone: string;
           user_id: string;
         };
@@ -153,6 +163,7 @@ export type Database = {
           kcal_min: number;
           last_closed_on?: string | null;
           protein_target_g: number;
+          rules_from: string;
           timezone?: string;
           user_id: string;
         };
@@ -164,6 +175,7 @@ export type Database = {
           kcal_min?: number;
           last_closed_on?: string | null;
           protein_target_g?: number;
+          rules_from?: string;
           timezone?: string;
           user_id?: string;
         };
@@ -218,6 +230,7 @@ export type Database = {
           goal_type: string;
           id: string;
           is_core: boolean;
+          on_rest_days: boolean;
           schedule_days: number[] | null;
           sort_order: number;
           stat_tags: string[];
@@ -238,6 +251,7 @@ export type Database = {
           goal_type: string;
           id?: string;
           is_core?: boolean;
+          on_rest_days?: boolean;
           schedule_days?: number[] | null;
           sort_order?: number;
           stat_tags: string[];
@@ -257,6 +271,7 @@ export type Database = {
           goal_type?: string;
           id?: string;
           is_core?: boolean;
+          on_rest_days?: boolean;
           schedule_days?: number[] | null;
           sort_order?: number;
           stat_tags?: string[];
@@ -265,6 +280,71 @@ export type Database = {
           tracking?: string;
           type?: string;
           unit?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      redemption_stone_events: {
+        Row: {
+          created_at: string;
+          delta: number;
+          id: string;
+          log_date: string | null;
+          occurred_on: string;
+          penalty_id: string | null;
+          reason: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          delta: number;
+          id?: string;
+          log_date?: string | null;
+          occurred_on: string;
+          penalty_id?: string | null;
+          reason: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          delta?: number;
+          id?: string;
+          log_date?: string | null;
+          occurred_on?: string;
+          penalty_id?: string | null;
+          reason?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      safe_periods: {
+        Row: {
+          created_at: string;
+          end_on: string;
+          ended_early_on: string | null;
+          id: string;
+          kind: string;
+          start_on: string;
+          user_id: string;
+        };
+        ComputedFields: never;
+        Insert: {
+          created_at?: string;
+          end_on: string;
+          ended_early_on?: string | null;
+          id?: string;
+          kind: string;
+          start_on: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          end_on?: string;
+          ended_early_on?: string | null;
+          id?: string;
+          kind?: string;
+          start_on?: string;
           user_id?: string;
         };
         Relationships: [];
@@ -447,6 +527,7 @@ export type Database = {
           goal_type: string;
           id: string;
           is_core: boolean;
+          on_rest_days: boolean;
           schedule_days: number[] | null;
           sort_order: number;
           stat_tags: string[];
@@ -487,13 +568,41 @@ export type Database = {
         };
         Returns: Record<string, unknown>;
       };
+      counts_toward_core_tally: {
+        Args: {
+          p_is_core: boolean;
+          p_on_rest_days: boolean;
+          p_rest_day: boolean;
+          p_scheduled: boolean;
+        };
+        Returns: boolean;
+      };
       daily_cap_for: { Args: { p_category: string }; Returns: number };
+      day_outcome: {
+        Args: {
+          p_core_done: number;
+          p_core_total: number;
+          p_phase2: boolean;
+          p_rest_day: boolean;
+          p_safe: boolean;
+        };
+        Returns: Record<string, unknown>;
+      };
       delete_food: { Args: { p_id: string }; Returns: Json };
       delete_workout: { Args: { p_id: string }; Returns: Json };
+      earns_stone: {
+        Args: { p_held: number; p_mode: string; p_streak_after: number; p_streak_before: number };
+        Returns: boolean;
+      };
+      effective_rules: {
+        Args: { p_day: string; p_user: string };
+        Returns: Record<string, unknown>;
+      };
       effective_targets: {
         Args: { p_day: string; p_user: string };
         Returns: Record<string, unknown>;
       };
+      end_safe_period: { Args: { p_id: string }; Returns: Json };
       evaluate_auto_kcal_range: { Args: { p_day: string; p_user: string }; Returns: Json };
       evaluate_auto_protein: { Args: { p_day: string; p_user: string }; Returns: Json };
       evaluate_auto_workout: { Args: { p_day: string; p_user: string }; Returns: Json };
@@ -506,9 +615,11 @@ export type Database = {
       game_today: { Args: Record<PropertyKey, never>; Returns: string };
       game_today_for: { Args: { p_user: string }; Returns: string };
       hunter_snapshot: { Args: Record<PropertyKey, never>; Returns: Json };
+      is_safe_on: { Args: { p_day: string; p_user: string }; Returns: boolean };
       is_valid_timezone: { Args: { p_timezone: string }; Returns: boolean };
       log_food: { Args: { p_kcal: number; p_name: string; p_protein_g: number }; Returns: Json };
       log_workout: { Args: { p_notes: string; p_sets?: Json; p_title: string }; Returns: Json };
+      next_streak: { Args: { p_effect: string; p_previous: number }; Returns: number };
       onboard_hunter: {
         Args: {
           p_hunter_name: string;
@@ -520,11 +631,61 @@ export type Database = {
         Returns: Json;
       };
       pending_report: { Args: Record<PropertyKey, never>; Returns: Json };
+      quest_on_board: {
+        Args: {
+          p_day: string;
+          p_quest: Omit<
+            Database['public']['Tables']['quests']['Row'],
+            Database['public']['Tables']['quests']['ComputedFields']
+          >;
+          p_timezone: string;
+        };
+        Returns: boolean;
+      };
+      quest_overdue_on: {
+        Args: { p_day: string; p_due_on: string; p_is_done: boolean; p_type: string };
+        Returns: boolean;
+      };
+      quest_scheduled_on: {
+        Args: {
+          p_archived_at: string;
+          p_created_at: string;
+          p_day: string;
+          p_due_on: string;
+          p_schedule_days: number[];
+          p_timezone: string;
+          p_type: string;
+        };
+        Returns: boolean;
+      };
       quest_xp_for: { Args: { p_difficulty: string }; Returns: number };
       reverse_quest_completion: {
         Args: { p_completion_id: string; p_user: string };
         Returns: Json;
       };
+      safe_days_bookable: { Args: { p_start_on: string; p_user: string }; Returns: number };
+      safe_effective_end: { Args: { p_end_on: string; p_ended_early_on: string }; Returns: string };
+      safe_period_refusal: {
+        Args: {
+          p_days: number;
+          p_ended_early: string[];
+          p_ends: string[];
+          p_start_on: string;
+          p_starts: string[];
+        };
+        Returns: string;
+      };
+      safe_period_refusal_for: {
+        Args: { p_days: number; p_start_on: string; p_user: string };
+        Returns: string;
+      };
+      safe_period_start: {
+        Args: { p_mode: string; p_now: string; p_timezone: string };
+        Returns: string;
+      };
+      safe_start_for: { Args: { p_user: string }; Returns: string };
+      start_safe_period: { Args: { p_days: number; p_kind: string }; Returns: Json };
+      stones_held: { Args: { p_user: string }; Returns: number };
       undo_completion: { Args: { p_completion_id: string }; Returns: Json };
       update_hunter_profile: {
         Args: {
@@ -536,6 +697,11 @@ export type Database = {
         };
         Returns: Json;
       };
+      update_hunter_rules: {
+        Args: { p_penalty_mode: string; p_rest_days: number[] };
+        Returns: Json;
+      };
+      weekdays_are_distinct: { Args: { p_days: number[] }; Returns: boolean };
     };
     Enums: {
       [_ in never]: never;

@@ -6,6 +6,10 @@ import configMigration from '../../supabase/migrations/20261123000100_game_confi
 import phase1ConfigMigration from '../../supabase/migrations/20261122000300_game_config.sql?raw';
 import parityTest from '../../supabase/tests/game_date_parity.sql?raw';
 import scheduleParityTest from '../../supabase/tests/quest_schedule_parity.sql?raw';
+import safeZoneParityTest from '../../supabase/tests/safe_zone_parity.sql?raw';
+import dayStatusVectors from './testdata/day-status-vectors.json';
+import streakVectors from './testdata/streak-vectors.json';
+import safeZoneVectors from './testdata/safe-zone-vectors.json';
 
 /**
  * ADR-4 / C2 drift guard.
@@ -87,5 +91,32 @@ describe('generated quest schedule parity test', () => {
     // returning one value.
     expect(scheduleParityTest).toContain('is distinct from true');
     expect(scheduleParityTest).toContain('is distinct from false');
+  });
+});
+
+describe('generated safe zone parity test (Step 2.2)', () => {
+  it('is marked as generated', () => {
+    expect(safeZoneParityTest).toContain('GENERATED FILE - DO NOT EDIT BY HAND');
+  });
+
+  it('asserts every day outcome, streak and safe period vector', () => {
+    expect([...safeZoneParityTest.matchAll(/from public\.day_outcome\(/g)]).toHaveLength(
+      dayStatusVectors.length,
+    );
+    expect([...safeZoneParityTest.matchAll(/v_effects := array\[/g)]).toHaveLength(
+      streakVectors.length,
+    );
+    expect([...safeZoneParityTest.matchAll(/public\.safe_period_start\(/g)]).toHaveLength(
+      safeZoneVectors.start.length,
+    );
+    expect([...safeZoneParityTest.matchAll(/public\.safe_period_refusal\(/g)]).toHaveLength(
+      safeZoneVectors.quota.length,
+    );
+  });
+
+  it('carries the hand-written notes', () => {
+    for (const vector of [...dayStatusVectors, ...streakVectors, ...safeZoneVectors.quota]) {
+      expect(safeZoneParityTest).toContain(`-- ${vector.note}`);
+    }
   });
 });
