@@ -11,7 +11,7 @@ import {
   useLogWorkout,
   type AutoOutcome,
 } from '../../lib/mutations/logs';
-import { awardedStats } from '../../lib/mutations/quests';
+import { awardedStats, modifierLines } from '../../lib/mutations/quests';
 import { useWorkouts } from '../../lib/queries/logs';
 import type { HunterSnapshot } from '../../lib/schemas';
 import { systemMessage } from '../../lib/systemError';
@@ -51,6 +51,7 @@ export function WorkoutTab({ snapshot }: { snapshot: HunterSnapshot }) {
           award.capped && award.xp === 0
             ? systemCopy.quests.capped
             : `+${award.xp} XP${stats === '' ? '' : ` · ${stats}`}`,
+          ...modifierLines(award),
         ],
       });
     } else if (outcome.action === 'reversed') {

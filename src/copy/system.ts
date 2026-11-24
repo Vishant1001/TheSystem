@@ -3,6 +3,12 @@
  * in one place. Errors are mapped from the stable tokens the RPCs raise - the
  * hunter never sees a raw exception.
  */
+import { GAME_CONFIG } from '../game/config';
+
+// Game numbers quoted in copy come from the config, never from literals here.
+const { penalty: P, safeZones: Z } = GAME_CONFIG;
+const hh = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
+
 export const systemCopy = {
   app: {
     name: 'THE SYSTEM',
@@ -23,6 +29,11 @@ export const systemCopy = {
     registration: 'HUNTER REGISTRATION',
     questDesigner: 'QUEST DESIGNER',
     settings: 'HUNTER SETTINGS',
+    penaltyZone: 'PENALTY ZONE',
+    penaltyWarning: 'WARNING',
+    activePenalty: 'ACTIVE PENALTY',
+    safeZones: 'SAFE ZONES',
+    survivalTrial: 'SURVIVAL TRIAL',
     unknownGate: 'UNKNOWN GATE',
   },
   auth: {
@@ -63,6 +74,11 @@ export const systemCopy = {
     pendingChange: 'Your new targets are waiting for the next game day.',
   },
   status: {
+    streak: 'Streak',
+    stones: 'Stones',
+    weakened: 'Weakened',
+    restDay: 'Rest day',
+    safeDay: 'Safe day',
     level: 'Level',
     rank: 'Rank',
     xp: 'XP',
@@ -75,6 +91,13 @@ export const systemCopy = {
     cap: 'cap',
   },
   quests: {
+    restOptional: 'Rest day - optional',
+    repaid: (xp: number) => `${String(xp)} XP went to your XP Debt`,
+    weakenedZeroed: 'Weakened: that stat gained nothing',
+    restDayBanner: 'Rest day. Only quests marked for rest days count.',
+    safeDayBanner: 'Safe day. No penalty can be created today.',
+    trialDeadline: (countdown: string) => `Deadline in ${countdown}`,
+    trialAuto: 'Tracked by the System: log your meals.',
     core: 'Core',
     complete: 'Complete',
     undo: 'Undo',
@@ -130,6 +153,8 @@ export const systemCopy = {
     dueOn: 'Due date',
     dueOnHint: 'A core one-time quest needs a due date.',
     manualOnly: 'Custom quests are completed by hand; the System tracks only its own four.',
+    onRestDays: 'Counts on rest days',
+    onRestDaysHint: 'On your rest days only core quests marked here still count.',
   },
   log: {
     totals: 'TODAY',
@@ -168,6 +193,10 @@ export const systemCopy = {
     intro: 'The System has closed the days you were away.',
     cleared: 'Cleared',
     failed: 'Failed',
+    rest: 'Rest',
+    safe: 'Safe',
+    streak: 'Streak',
+    stoneEarned: '+1 Redemption Stone',
     coreQuests: 'Core',
     freePoint: 'free point',
     freePoints: 'free points',
@@ -176,6 +205,114 @@ export const systemCopy = {
     earlierDays: 'earlier days',
     working: 'Acknowledging',
     closing: 'The System is closing the days you were away.',
+  },
+  penalty: {
+    warning: (countdown: string) => `Daily quest incomplete. Penalty Zone in ${countdown}.`,
+    failedDay: 'Failed day',
+    missed: 'Missed',
+    choosePrompt: 'You failed a day. Choose your penalty, hunter.',
+    choose: 'Accept penalty',
+    choosing: 'The System is applying your penalty.',
+    pickOne: 'Select one option.',
+    trialTitle: 'Survival Trial',
+    trialBody: (title: string, target: string, hours: number, xp: number) =>
+      `${title}: ${target} within ${String(hours)} h. Complete it to clear the penalty and earn ${String(xp)} XP.`,
+    trialFailure: `If the deadline passes, it becomes a ${String(P.debtRatePercent.escalated)}% XP Debt.`,
+    debtTitle: 'XP Debt',
+    debtBody: (amount: number) =>
+      `XP Debt: ${String(amount)} XP - half of your XP goes to repayment until it's cleared.`,
+    weakenedTitle: 'Weakened',
+    weakenedBody: (stat: string, until: string) =>
+      `Weakened: ${stat} gains no stat XP until ${until}.`,
+    durationTarget: (minutes: number) => `${String(minutes)} min`,
+    countTarget: (count: number) => `log at least ${String(count)} meals`,
+    lenientTitle: 'XP Debt applied',
+    lenientBody: (amount: number) =>
+      `Lenient mode: a ${String(amount)} XP debt has been applied. Half of your XP goes to repayment until it's cleared.`,
+    hardcoreTitle: 'Survival Trial assigned',
+    hardcoreBody: 'Hardcore mode: the Survival Trial is your only option.',
+    escalatedTitle: 'Penalty escalated',
+    escalatedBody: (amount: number) =>
+      `The penalty was not resolved. It is now an XP Debt of ${String(amount)} XP.`,
+    acknowledge: 'Acknowledge',
+    acknowledging: 'Acknowledging',
+    redeem: 'Spend a Redemption Stone',
+    redeemTitle: 'REDEMPTION',
+    redeemBody:
+      'Spend one Redemption Stone to clear this penalty completely. This cannot be undone.',
+    redeemConfirm: 'Spend stone',
+    redeemCancel: 'Keep it',
+    redeeming: 'The System is redeeming the penalty.',
+    redeemed: 'Penalty redeemed.',
+    stonesHeld: (count: number) => `Redemption Stones: ${String(count)}`,
+    stonesFrozen: 'Hardcore mode: Redemption Stones are frozen.',
+    debtLeft: (remaining: number, amount: number) =>
+      `XP Debt: ${String(remaining)} of ${String(amount)} XP left`,
+    debtHint: 'Half of quest, workout and record XP goes to repayment.',
+    trialLeft: (countdown: string) => `Survival Trial: ${countdown} left`,
+    trialHint: 'Complete the trial on the Quests board.',
+    weakenedLeft: (stat: string, until: string) => `${stat} weakened until ${until}`,
+    weakenedHint: 'That stat earns no stat XP. Everything else is unaffected.',
+    pendingLeft: 'A penalty choice is waiting.',
+    deadlineAt: (when: string) => `Deadline: ${when}`,
+    trialToast: '[Trial cleared]',
+  },
+  safeZones: {
+    open: 'Safe Zones',
+    prompt: 'Rest, recover, travel. The System allows it, within limits.',
+    modeTitle: 'Penalty mode',
+    modes: {
+      lenient: {
+        name: 'Lenient',
+        description: `Warning from ${hh(P.warningStartHour.lenient)}. A failed day applies a ${String(P.debtRatePercent.lenient)}% XP Debt automatically.`,
+      },
+      standard: {
+        name: 'Standard',
+        description: `Warning from ${hh(P.warningStartHour.standard)}. A failed day lets you choose your penalty.`,
+      },
+      hardcore: {
+        name: 'Hardcore',
+        description: `Warning from ${hh(P.warningStartHour.hardcore)}. Survival Trial only. No Redemption Stones.`,
+      },
+    },
+    restTitle: 'Rest days',
+    restHint: (max: number) =>
+      `Up to ${String(max)} days a week. Only core quests marked for rest days count on them, and a rest day never creates a penalty.`,
+    fromTomorrow: 'Changes apply from tomorrow, so no failing day can be dodged.',
+    inForceToday: 'In force today',
+    tomorrow: 'From tomorrow',
+    saveRules: 'Save rules',
+    savingRules: 'The System is updating your rules.',
+    rulesSaved: 'Rules saved. They apply from tomorrow.',
+    tooManyRestDays: (max: number) => `Choose at most ${String(max)} rest days.`,
+    noRestDays: 'none',
+    safeTitle: 'Sick / Travel',
+    safeHint: 'Safe days create no penalty, pay no free point and leave your streak alone.',
+    kind: 'Reason',
+    kindSick: 'Sick',
+    kindTravel: 'Travel',
+    days: 'Days',
+    startsOn: (day: string) => `Starts ${day}`,
+    quotaLeft: (days: number) => `${String(days)} safe days available from that day`,
+    quotaRule: (quota: number, window: number) =>
+      `At most ${String(quota)} safe days in any ${String(window)} days.`,
+    quotaEmpty: 'The System has granted all the safe days it can for now.',
+    alreadyCovered: (day: string) =>
+      `A safe zone already covers ${day}. End it early to change your plans.`,
+    activate: 'Activate',
+    activating: 'The System is opening a safe zone.',
+    activated: 'Safe zone active.',
+    periods: 'Current and upcoming',
+    periodRange: (start: string, end: string) => `${start} - ${end}`,
+    endEarly: 'End early',
+    endEarlyTitle: 'END SAFE ZONE',
+    endEarlyBody: 'The safe zone ends from tomorrow. Unused days return to your quota.',
+    endEarlyConfirm: 'End it',
+    endEarlyCancel: 'Keep it',
+    ended: 'Safe zone ends tomorrow.',
+    back: 'Back to settings',
+    weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    weekdayNames: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
   },
   levelUp: {
     title: 'LEVEL UP',
@@ -270,6 +407,23 @@ export const systemCopy = {
     INVALID_SETS: 'Those sets are not valid.',
     POINTS_MUST_BE_POSITIVE: 'Allocate at least one point.',
     UNKNOWN_STAT_TAG: 'That is not a known stat.',
+    TRIAL_EXPIRED: 'The trial deadline has passed. The penalty has escalated.',
+    TRIAL_IS_FINAL: 'A completed trial cannot be undone.',
+    TRIAL_IMMUTABLE: 'The System does not let you alter a trial.',
+    NO_PENDING_CHOICE: 'There is no penalty waiting for a choice.',
+    INVALID_PENALTY_CHOICE: 'That penalty is not available in this mode.',
+    PENALTY_NOT_FOUND: 'That penalty is not in your record.',
+    PENALTY_NOT_OPEN: 'That penalty is already resolved.',
+    STONES_FROZEN: 'Hardcore mode: Redemption Stones are frozen.',
+    NO_STONES: 'You hold no Redemption Stones.',
+    INVALID_PENALTY_MODE: 'That penalty mode does not exist.',
+    INVALID_REST_DAYS: `Choose at most ${String(Z.maxRestDays)} different rest days.`,
+    INVALID_SAFE_KIND: 'Choose sick or travel.',
+    SAFE_PERIOD_LENGTH: `A safe zone lasts ${String(Z.minPeriodDays)} to ${String(Z.maxPeriodDays)} days.`,
+    SAFE_PERIOD_OVERLAP: 'You already have a safe zone on those days.',
+    SAFE_QUOTA_EXCEEDED: `Request denied. The System grants at most ${String(Z.quotaDays)} safe days in any ${String(Z.quotaWindowDays)}.`,
+    SAFE_PERIOD_NOT_FOUND: 'That safe zone is not in your record.',
+    SAFE_PERIOD_NOT_ACTIVE: 'That safe zone has already ended.',
   } as Record<string, string>,
   /** Supabase Auth failures, which arrive as messages rather than tokens. */
   authErrors: {

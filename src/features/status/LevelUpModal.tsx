@@ -6,7 +6,7 @@ import { systemCopy } from '../../copy/system';
 import { GAME_CONFIG, deriveHunterState, rankFromLevel, type Rank } from '../../game';
 import { useQueryClient } from '@tanstack/react-query';
 import { hunterSnapshotKey, useHunterSnapshot } from '../../lib/queries/hunterSnapshot';
-import { toEngineSnapshot, type HunterSnapshot } from '../../lib/schemas';
+import { attentionGate, toEngineSnapshot, type HunterSnapshot } from '../../lib/schemas';
 
 interface LevelUp {
   fromLevel: number;
@@ -52,18 +52,27 @@ export function LevelUpWatcher() {
     // The first reading is the starting point, not an event.
     if (previous === null || level <= previous) return;
 
-    setLevelUp({
-      fromLevel: previous,
-      toLevel: level,
-      freePoints: GAME_CONFIG.freePoints.perLevel * (level - previous),
-      rankFrom: rankFromLevel(previous),
-      rankTo: rankFromLevel(level),
+    // Several level-ups while a gate is open merge into one modal (7.3),
+    // starting from the level before the first of them.
+    setLevelUp((pending) => {
+      const from = pending?.fromLevel ?? previous;
+      return {
+        fromLevel: from,
+        toLevel: level,
+        freePoints: GAME_CONFIG.freePoints.perLevel * (level - from),
+        rankFrom: rankFromLevel(from),
+        rankTo: rankFromLevel(level),
+      };
     });
   }, [data]);
 
+  // Brief 3.5: Report -> Penalty -> Level-up. A level-up earned while a gate
+  // is open waits, and shows the moment both are cleared.
+  const gated = data !== null && data !== undefined && attentionGate(data) !== null;
+
   return (
     <LevelUpModal
-      levelUp={levelUp}
+      levelUp={gated ? null : levelUp}
       onDismiss={() => {
         setLevelUp(null);
       }}

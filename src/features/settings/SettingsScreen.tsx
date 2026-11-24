@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { HunterProfileForm } from '../../components/HunterProfileForm';
 import { SystemButton } from '../../components/SystemButton';
+import { SystemLink } from '../../components/SystemLink';
 import { SystemErrorPanel, SystemLoading } from '../../components/SystemStates';
 import { SystemWindow } from '../../components/SystemWindow';
 import { systemCopy } from '../../copy/system';
@@ -120,6 +121,10 @@ export function SettingsScreen() {
           <p className="pt-3 text-xs text-system-glow">{systemCopy.settings.pendingChange}</p>
         )}
       </SystemWindow>
+
+      <SystemLink to="/settings/safe-zones" className="w-full">
+        {systemCopy.safeZones.open}
+      </SystemLink>
 
       <div className="flex justify-center gap-3 pb-2">
         <SystemButton

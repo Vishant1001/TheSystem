@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { EmptyState } from '../../components/EmptyState';
 import { SystemErrorPanel, SystemLoading } from '../../components/SystemStates';
 import { SystemLink } from '../../components/SystemLink';
@@ -6,63 +5,71 @@ import { SystemWindow } from '../../components/SystemWindow';
 import { PlusIcon } from '../../components/icons';
 import { useToast } from '../../components/toastContext';
 import { systemCopy } from '../../copy/system';
-import { awardedStats, useCompleteQuest, useUndoCompletion } from '../../lib/mutations/quests';
+import { formatCountdown } from '../../game';
+import {
+  awardedStats,
+  modifierLines,
+  useCompleteQuest,
+  useUndoCompletion,
+} from '../../lib/mutations/quests';
 import { useHunterSnapshot } from '../../lib/queries/hunterSnapshot';
 import { kcalStatus, sumFood, useFood } from '../../lib/queries/logs';
-import {
-  buildQuestBoard,
-  useCompletions,
-  useOneTimeCompletions,
-  useQuests,
-} from '../../lib/queries/quests';
+import type { QuestView } from '../../lib/queries/quests';
 import { systemMessage } from '../../lib/systemError';
+import { useNow } from '../../lib/useNow';
+import { PenaltyWarning } from '../penalty/PenaltyWarning';
 import { QuestCard } from './QuestCard';
+import { useTodayBoard } from './useTodayBoard';
+
+function TrialDeadline({ deadline }: { deadline: string }) {
+  const now = useNow(1000);
+  return (
+    <span data-readout>
+      {systemCopy.quests.trialDeadline(
+        formatCountdown(new Date(deadline).getTime() - now.getTime()),
+      )}
+    </span>
+  );
+}
 
 export function QuestsScreen() {
   const snapshot = useHunterSnapshot();
-  const day = snapshot.data?.game_today;
-  const timezone = snapshot.data?.hunter.timezone;
+  const data = snapshot.data;
+  const day = data?.game_today;
 
-  const quests = useQuests();
+  const today = useTodayBoard(data);
   const food = useFood(day);
-  const completions = useCompletions(day);
-  const oneTimeCompletions = useOneTimeCompletions();
   const toast = useToast();
 
   const complete = useCompleteQuest(day);
   const undo = useUndoCompletion(day);
 
-  const board = useMemo(() => {
-    if (quests.data === undefined || completions.data === undefined || day === undefined) {
-      return null;
-    }
-    return buildQuestBoard(
-      quests.data,
-      [...completions.data, ...(oneTimeCompletions.data ?? [])],
-      day,
-      timezone ?? 'UTC',
-    );
-  }, [quests.data, completions.data, oneTimeCompletions.data, day, timezone]);
-
-  const isPending = snapshot.isPending || quests.isPending || completions.isPending;
-  const error = snapshot.error ?? quests.error ?? completions.error ?? oneTimeCompletions.error;
-
-  if (isPending) return <SystemLoading />;
-  if (error !== null || board === null) {
+  if (snapshot.isPending || today.isPending) return <SystemLoading />;
+  const error = snapshot.error ?? today.error;
+  if (error !== null || today.board === null || data === null || data === undefined) {
     return (
       <SystemErrorPanel
         message={systemMessage(error, systemCopy.errors.load)}
         onRetry={() => {
-          void quests.refetch();
-          void completions.refetch();
+          today.refetch();
         }}
       />
     );
   }
 
+  const board = today.board;
+  const zones = data.safe_zones;
   const busy = complete.isPending || undo.isPending;
   const totals = sumFood(food.data);
-  const targets = snapshot.data?.effective_targets_today;
+  const targets = data.effective_targets_today;
+
+  // Only the trial of the open penalty belongs on the board (brief 3.4).
+  const penalty = data.penalty;
+  const openTrial = penalty?.state === 'trial_active' ? (penalty.trial ?? null) : null;
+  const activeTrial =
+    openTrial === null
+      ? undefined
+      : board.trial.find((view) => view.quest.id === openTrial.quest_id);
 
   /**
    * 5.8: the calorie quest is judged only at day close, so the board reports
@@ -73,7 +80,7 @@ export function QuestsScreen() {
     tracking: string,
   ): { text: string; tone: 'steel' | 'system' | 'penalty' } | undefined {
     // A failed food read must not render as "0 kcal": show nothing instead.
-    if (targets === undefined || food.isError) return undefined;
+    if (food.isError) return undefined;
 
     if (tracking === 'auto_kcal_range') {
       const status = kcalStatus(totals.kcal, targets.kcal_min, targets.kcal_max);
@@ -98,9 +105,9 @@ export function QuestsScreen() {
     return undefined;
   }
 
-  function handleComplete(questId: string, value: number | null) {
+  function handleComplete(view: QuestView, value: number | null) {
     complete.mutate(
-      { questId, value },
+      { questId: view.quest.id, value },
       {
         onSuccess: (award) => {
           const stats = awardedStats(award)
@@ -112,7 +119,12 @@ export function QuestsScreen() {
               : `+${award.xp} XP${stats === '' ? '' : ` · ${stats}`}`,
           ];
           if (award.capped && award.xp > 0) lines.push(systemCopy.quests.capped);
-          toast.show({ title: systemCopy.quests.toastTitle, lines });
+          lines.push(...modifierLines(award));
+          const title =
+            view.quest.type === 'trial'
+              ? systemCopy.penalty.trialToast
+              : systemCopy.quests.toastTitle;
+          toast.show({ title, lines });
         },
         onError: (mutationError) => {
           toast.show({
@@ -140,27 +152,50 @@ export function QuestsScreen() {
     });
   }
 
+  const restDay = zones.is_rest_day_today;
+  const card = (view: QuestView, live?: ReturnType<typeof liveStatusFor>) => (
+    <QuestCard
+      key={view.quest.id}
+      view={view}
+      pending={busy}
+      liveStatus={live}
+      restOptional={restDay && view.quest.is_core && !view.quest.on_rest_days}
+      onComplete={(value) => {
+        handleComplete(view, value);
+      }}
+      onUndo={() => {
+        if (view.completion !== null) handleUndo(view.completion.id);
+      }}
+    />
+  );
+
   return (
     <>
+      <PenaltyWarning snapshot={data} coreRemaining={today.coreRemaining} />
+
+      {activeTrial !== undefined && openTrial !== null && (
+        <SystemWindow
+          variant="penalty"
+          title={systemCopy.windows.survivalTrial}
+          headerAside={<TrialDeadline deadline={openTrial.deadline} />}
+        >
+          <ul className="flex flex-col">{card(activeTrial)}</ul>
+        </SystemWindow>
+      )}
+
       <SystemWindow title={systemCopy.windows.dailyQuest} headerAside={day}>
+        {(zones.is_safe_today || restDay) && (
+          <p className="mb-2 border-l-2 border-system/50 pl-3 text-xs text-steel">
+            {zones.is_safe_today
+              ? systemCopy.quests.safeDayBanner
+              : systemCopy.quests.restDayBanner}
+          </p>
+        )}
         {board.daily.length === 0 ? (
           <EmptyState message={systemCopy.empty.quests} />
         ) : (
           <ul className="flex flex-col divide-y divide-system/10">
-            {board.daily.map((view) => (
-              <QuestCard
-                key={view.quest.id}
-                view={view}
-                pending={busy}
-                liveStatus={liveStatusFor(view.quest.tracking)}
-                onComplete={(value) => {
-                  handleComplete(view.quest.id, value);
-                }}
-                onUndo={() => {
-                  if (view.completion !== null) handleUndo(view.completion.id);
-                }}
-              />
-            ))}
+            {board.daily.map((view) => card(view, liveStatusFor(view.quest.tracking)))}
           </ul>
         )}
       </SystemWindow>
@@ -170,19 +205,7 @@ export function QuestsScreen() {
           <EmptyState message={systemCopy.empty.oneTimeQuests} />
         ) : (
           <ul className="flex flex-col divide-y divide-system/10">
-            {board.oneTime.map((view) => (
-              <QuestCard
-                key={view.quest.id}
-                view={view}
-                pending={busy}
-                onComplete={(value) => {
-                  handleComplete(view.quest.id, value);
-                }}
-                onUndo={() => {
-                  if (view.completion !== null) handleUndo(view.completion.id);
-                }}
-              />
-            ))}
+            {board.oneTime.map((view) => card(view))}
           </ul>
         )}
       </SystemWindow>

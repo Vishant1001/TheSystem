@@ -8,11 +8,12 @@ import { useToast } from '../../components/toastContext';
 import { systemCopy } from '../../copy/system';
 import {
   awardFromOutcome,
+  trialAwardFrom,
   useDeleteFood,
   useLogFood,
   type AutoOutcome,
 } from '../../lib/mutations/logs';
-import { awardedStats } from '../../lib/mutations/quests';
+import { awardedStats, modifierLines } from '../../lib/mutations/quests';
 import { kcalStatus, sumFood, useFood } from '../../lib/queries/logs';
 import type { HunterSnapshot } from '../../lib/schemas';
 import { systemMessage } from '../../lib/systemError';
@@ -62,6 +63,7 @@ export function FoodTab({ snapshot }: { snapshot: HunterSnapshot }) {
           award.capped && award.xp === 0
             ? systemCopy.quests.capped
             : `+${award.xp} XP${stats === '' ? '' : ` · ${stats}`}`,
+          ...modifierLines(award),
         ],
       });
     } else if (outcome.action === 'reversed') {
@@ -88,6 +90,16 @@ export function FoodTab({ snapshot }: { snapshot: HunterSnapshot }) {
           setKcal('');
           setProtein('');
           reportAuto(result.auto_protein);
+          const trial = trialAwardFrom(result.trial);
+          if (trial !== null) {
+            const stats = awardedStats(trial)
+              .map((entry) => `${entry.id} +${entry.amount}`)
+              .join(' · ');
+            toast.show({
+              title: systemCopy.penalty.trialToast,
+              lines: [`+${trial.xp} XP${stats === '' ? '' : ` · ${stats}`}`],
+            });
+          }
         },
         onError: (error) => {
           setFormError(systemMessage(error));

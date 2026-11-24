@@ -37,6 +37,14 @@ export function systemMessage(
   return fallback;
 }
 
+/** The stable token an RPC raised (e.g. "TRIAL_EXPIRED"), or null. */
+export function errorToken(error: unknown): string | null {
+  const raw = extractMessage(error);
+  if (raw === null) return null;
+  const token = raw.split(':')[0]?.trim() ?? '';
+  return /^[A-Z][A-Z_]+$/.test(token) ? token : null;
+}
+
 function extractMessage(error: unknown): string | null {
   if (typeof error === 'string') return error;
   if (error instanceof Error) return error.message;

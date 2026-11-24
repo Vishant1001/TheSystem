@@ -13,6 +13,8 @@ export function AppShell() {
   const dayClose = useDayClose(true);
   const { pathname } = useLocation();
   const settling = dayClose === 'idle' || dayClose === 'closing';
+  // The gates offer no navigation besides Retry and Sign out (brief 3.5).
+  const onGate = pathname === '/report' || pathname === '/penalty';
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pt-safe pb-28">
@@ -33,7 +35,7 @@ export function AppShell() {
         )}
       </main>
       <LevelUpWatcher />
-      <BottomNav />
+      {!onGate && <BottomNav />}
     </div>
   );
 }

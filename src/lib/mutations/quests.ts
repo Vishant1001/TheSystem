@@ -1,10 +1,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
+import { systemCopy } from '../../copy/system';
 import { STAT_IDS } from '../../game';
 import type { TablesInsert, TablesUpdate } from '../database.types';
 import { hunterSnapshotKey } from '../queries/hunterSnapshot';
 import { completionsKey, oneTimeCompletionsKey, questsKey } from '../queries/quests';
 import { supabase } from '../supabase';
+import { errorToken } from '../systemError';
+import { runDayClose } from '../../features/report/useDayClose';
 
 export const questAwardSchema = z.object({
   completion_id: z.string(),
@@ -23,7 +26,18 @@ export const questAwardSchema = z.object({
     INT: z.coerce.number(),
     SENSE: z.coerce.number(),
   }),
+  /** Brief 3.4: the part of this award diverted to an XP Debt (Phase 2). */
+  debt_repayment: z.coerce.number().default(0),
+  weakened: z.boolean().default(false),
 });
+
+/** Extra toast lines for the Penalty Zone modifiers on an award. */
+export function modifierLines(award: QuestAward): string[] {
+  const lines: string[] = [];
+  if (award.debt_repayment > 0) lines.push(systemCopy.quests.repaid(award.debt_repayment));
+  if (award.weakened) lines.push(systemCopy.quests.weakenedZeroed);
+  return lines;
+}
 
 export type QuestAward = z.infer<typeof questAwardSchema>;
 
@@ -51,6 +65,7 @@ function useLedgerInvalidation() {
 
 export function useCompleteQuest(day: string | undefined) {
   const invalidate = useLedgerInvalidation();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ questId, value }: { questId: string; value: number | null }) => {
@@ -62,7 +77,14 @@ export function useCompleteQuest(day: string | undefined) {
       if (error) throw error;
       return questAwardSchema.parse(data);
     },
-    onSettled: async () => {
+    onSettled: async (_data, error) => {
+      // An expired trial is refused, and the refusal rolls back the escalation
+      // the server started (step 2.3). Close the days now so the escalated
+      // debt and its acknowledgement screen appear immediately.
+      if (errorToken(error) === 'TRIAL_EXPIRED') {
+        await runDayClose(queryClient).catch(() => undefined);
+        return;
+      }
       await invalidate(day);
     },
   });

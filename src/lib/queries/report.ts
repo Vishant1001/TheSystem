@@ -5,11 +5,14 @@ import { supabase } from '../supabase';
 
 export const reportDaySchema = z.object({
   log_date: z.string(),
-  status: z.enum(['cleared', 'failed']),
+  status: z.enum(['cleared', 'failed', 'rest', 'safe']),
   core_total: z.coerce.number(),
   core_done: z.coerce.number(),
   xp_gained: z.coerce.number(),
   free_points_gained: z.coerce.number(),
+  // Phase 2 (3.6): the streak after the close, and whether it earned a stone.
+  streak: z.coerce.number(),
+  stone_earned: z.boolean(),
 });
 
 export type ReportDay = z.infer<typeof reportDaySchema>;

@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { isOverdue, isScheduledOn, type ScheduleInput } from '../../game';
+import {
+  countsTowardCoreTally,
+  isOverdue,
+  isScheduledOn,
+  type QuestType,
+  type ScheduleInput,
+} from '../../game';
 import { gameDateAt } from '../../game';
 import type { Tables } from '../database.types';
 import { supabase } from '../supabase';
@@ -33,7 +39,8 @@ export async function fetchCompletions(day: string): Promise<QuestCompletionRow[
 }
 
 /**
- * Live completions of one-time quests, whatever day they happened on. Without
+ * Live completions of one-time quests and Survival Trials, whatever day they
+ * happened on. Without
  * this a one-time quest finished last week would look outstanding again today,
  * since the day query only covers today.
  */
@@ -41,7 +48,7 @@ export async function fetchOneTimeCompletions(): Promise<QuestCompletionRow[]> {
   const { data, error } = await supabase
     .from('quest_completions')
     .select('*, quests!inner(type)')
-    .eq('quests.type', 'one_time')
+    .in('quests.type', ['one_time', 'trial'])
     .is('reversed_at', null);
   if (error) throw error;
   return data.map(({ quests: _quests, ...completion }) => completion);
@@ -77,11 +84,13 @@ export interface QuestView {
 export interface QuestBoard {
   daily: QuestView[];
   oneTime: QuestView[];
+  /** Survival Trials still on the board (brief 3.4), pinned above the rest. */
+  trial: QuestView[];
 }
 
 function toScheduleInput(quest: QuestRow, timezone: string): ScheduleInput {
   return {
-    type: quest.type === 'one_time' ? 'one_time' : 'daily',
+    type: quest.type as QuestType,
     scheduleDays: quest.schedule_days,
     dueOn: quest.due_on,
     createdOn: gameDateAt(new Date(quest.created_at), timezone),
@@ -150,5 +159,31 @@ export function buildQuestBoard(
       return a.quest.sort_order - b.quest.sort_order;
     });
 
-  return { daily, oneTime };
+  const trial = quests.filter((quest) => quest.type === 'trial').map(toView);
+
+  return { daily, oneTime, trial };
+}
+
+/**
+ * Core quests still open today, counted by the same rule close_days() tallies
+ * with (rest days included), for the Penalty Zone warning (brief 3.2).
+ */
+export function coreRemainingToday(
+  board: QuestBoard,
+  day: string,
+  timezone: string,
+  restDay: boolean,
+): number {
+  return [...board.daily, ...board.oneTime].filter(
+    (view) =>
+      countsTowardCoreTally(
+        {
+          isCore: view.quest.is_core,
+          onRestDays: view.quest.on_rest_days,
+          scheduled: isScheduledOn(toScheduleInput(view.quest, timezone), day),
+          done: view.isDone,
+        },
+        restDay,
+      ) && !view.isDone,
+  ).length;
 }

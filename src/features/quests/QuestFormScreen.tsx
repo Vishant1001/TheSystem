@@ -54,6 +54,7 @@ export function QuestFormScreen({ mode }: QuestFormScreenProps) {
   const [statTags, setStatTags] = useState<StatId[]>(['INT']);
   const [difficulty, setDifficulty] = useState<Difficulty>('C');
   const [isCore, setIsCore] = useState(false);
+  const [onRestDays, setOnRestDays] = useState(false);
   const [scheduleDays, setScheduleDays] = useState<number[]>([1, 2, 3, 4, 5, 6, 7]);
   const [dueOn, setDueOn] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -77,6 +78,7 @@ export function QuestFormScreen({ mode }: QuestFormScreenProps) {
     setStatTags(existing.stat_tags as StatId[]);
     setDifficulty(existing.difficulty as Difficulty);
     setIsCore(existing.is_core);
+    setOnRestDays(existing.on_rest_days);
     setScheduleDays(existing.schedule_days ?? [1, 2, 3, 4, 5, 6, 7]);
     setDueOn(existing.due_on ?? '');
     setHydrated(true);
@@ -118,6 +120,7 @@ export function QuestFormScreen({ mode }: QuestFormScreenProps) {
       statTags,
       difficulty,
       isCore,
+      onRestDays: isCore && type === 'daily' ? onRestDays : false,
       scheduleDays: type === 'daily' ? scheduleDays : null,
       dueOn: type === 'one_time' && dueOn !== '' ? dueOn : null,
     });
@@ -146,6 +149,7 @@ export function QuestFormScreen({ mode }: QuestFormScreenProps) {
       stat_tags: input.statTags,
       difficulty: input.difficulty,
       is_core: input.isCore,
+      on_rest_days: input.onRestDays,
       schedule_days: input.scheduleDays,
       due_on: input.dueOn,
     };
@@ -412,6 +416,22 @@ export function QuestFormScreen({ mode }: QuestFormScreenProps) {
           {systemCopy.questForm.core}
           <span className="text-xs text-steel">{systemCopy.questForm.coreHint}</span>
         </label>
+
+        {isCore && type === 'daily' && (
+          <label className="flex items-center gap-2 text-sm text-hunter">
+            <input
+              type="checkbox"
+              className="size-4 accent-[#2E8BFF]"
+              checked={onRestDays}
+              onChange={(event) => {
+                setOnRestDays(event.target.checked);
+              }}
+              disabled={pending}
+            />
+            {systemCopy.questForm.onRestDays}
+            <span className="text-xs text-steel">{systemCopy.questForm.onRestDaysHint}</span>
+          </label>
+        )}
 
         {formError !== null && (
           <p

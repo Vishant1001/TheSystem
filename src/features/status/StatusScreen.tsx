@@ -12,6 +12,9 @@ import { useAllocatePoints } from '../../lib/mutations/stats';
 import { useHunterSnapshot } from '../../lib/queries/hunterSnapshot';
 import { toEngineSnapshot } from '../../lib/schemas';
 import { systemMessage } from '../../lib/systemError';
+import { ActivePenalty } from '../penalty/ActivePenalty';
+import { PenaltyWarning } from '../penalty/PenaltyWarning';
+import { useTodayBoard } from '../quests/useTodayBoard';
 
 const categoryLabels: Record<Category, string> = {
   fitness: 'Fitness',
@@ -23,6 +26,7 @@ export function StatusScreen() {
   const { data, isPending, isError, error, refetch } = useHunterSnapshot();
   const allocate = useAllocatePoints();
   const [pendingStat, setPendingStat] = useState<StatId | null>(null);
+  const today = useTodayBoard(data);
 
   if (isPending) return <SystemLoading />;
   if (isError) {
@@ -39,9 +43,21 @@ export function StatusScreen() {
   if (data === null) return <SystemLoading />;
 
   const state = deriveHunterState(toEngineSnapshot(data));
+  const zones = data.safe_zones;
+  const penaltyOpen =
+    data.penalty !== null &&
+    ['trial_active', 'debt_active', 'weakened_active'].includes(data.penalty.state);
+  const dayChip = zones.is_safe_today
+    ? systemCopy.status.safeDay
+    : zones.is_rest_day_today
+      ? systemCopy.status.restDay
+      : null;
 
   return (
     <>
+      <PenaltyWarning snapshot={data} coreRemaining={today.coreRemaining} />
+      {penaltyOpen && <ActivePenalty snapshot={data} />}
+
       <SystemWindow
         title={systemCopy.windows.status}
         headerAside={`${systemCopy.status.rank} ${state.rank}`}
@@ -73,6 +89,15 @@ export function StatusScreen() {
               </span>
             </div>
           </div>
+
+          <div className="flex justify-between font-display text-xs tracking-wider text-steel">
+            <span data-readout>
+              {systemCopy.status.streak} <span className="text-hunter">{zones.streak}</span>
+            </span>
+            <span data-readout>
+              {systemCopy.status.stones} <span className="text-hunter">{zones.stones_held}</span>
+            </span>
+          </div>
         </div>
       </SystemWindow>
 
@@ -89,6 +114,7 @@ export function StatusScreen() {
             <StatRow
               key={stat.id}
               stat={stat}
+              weakened={data.weakened_stat_today === stat.id}
               action={
                 canAllocate(1, state.freePointsAvailable) ? (
                   <SystemButton
@@ -111,7 +137,10 @@ export function StatusScreen() {
         )}
       </SystemWindow>
 
-      <SystemWindow title={systemCopy.status.todayXp} headerAside={data.game_today}>
+      <SystemWindow
+        title={systemCopy.status.todayXp}
+        headerAside={dayChip === null ? data.game_today : `${data.game_today} · ${dayChip}`}
+      >
         <ul className="flex flex-col gap-3">
           {CATEGORIES.map((category) => {
             const earned = data.today_xp_by_category[category];

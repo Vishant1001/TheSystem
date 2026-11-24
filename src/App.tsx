@@ -5,15 +5,18 @@ import {
   RequireHunter,
   RequireNoHunter,
   RequireNoSession,
+  RequirePenaltyResolved,
   RequireReportAcknowledged,
   RequireSession,
 } from './components/guards';
 import { AuthScreen } from './features/auth/AuthScreen';
 import { LogScreen } from './features/log/LogScreen';
 import { OnboardingScreen } from './features/onboarding/OnboardingScreen';
+import { PenaltyScreen } from './features/penalty/PenaltyScreen';
 import { QuestFormScreen } from './features/quests/QuestFormScreen';
 import { QuestsScreen } from './features/quests/QuestsScreen';
 import { ReportScreen } from './features/report/ReportScreen';
+import { SafeZonesScreen } from './features/settings/SafeZonesScreen';
 import { SettingsScreen } from './features/settings/SettingsScreen';
 import { StatusScreen } from './features/status/StatusScreen';
 import { NotFoundScreen } from './features/system/NotFoundScreen';
@@ -48,13 +51,19 @@ export function App() {
               {/* The report itself is never gated, or it could not be read. */}
               <Route path="report" element={<ReportScreen />} />
 
+              {/* Report -> Penalty -> everything else (brief 3.5). */}
               <Route element={<RequireReportAcknowledged />}>
-                <Route index element={<StatusScreen />} />
-                <Route path="quests" element={<QuestsScreen />} />
-                <Route path="quests/new" element={<QuestFormScreen mode="create" />} />
-                <Route path="quests/:questId/edit" element={<QuestFormScreen mode="edit" />} />
-                <Route path="log" element={<LogScreen />} />
-                <Route path="settings" element={<SettingsScreen />} />
+                <Route path="penalty" element={<PenaltyScreen />} />
+
+                <Route element={<RequirePenaltyResolved />}>
+                  <Route index element={<StatusScreen />} />
+                  <Route path="quests" element={<QuestsScreen />} />
+                  <Route path="quests/new" element={<QuestFormScreen mode="create" />} />
+                  <Route path="quests/:questId/edit" element={<QuestFormScreen mode="edit" />} />
+                  <Route path="log" element={<LogScreen />} />
+                  <Route path="settings" element={<SettingsScreen />} />
+                  <Route path="settings/safe-zones" element={<SafeZonesScreen />} />
+                </Route>
               </Route>
             </Route>
           </Route>

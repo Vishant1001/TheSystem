@@ -25,7 +25,15 @@ export const foodMutationSchema = z.object({
   entry_id: z.string(),
   occurred_on: z.string(),
   auto_protein: autoOutcomeSchema,
+  /** Brief 3.4: the diet Survival Trial, when this entry completed it. */
+  trial: z.unknown().optional(),
 });
+
+/** The trial award behind a food log, when that log cleared the trial. */
+export function trialAwardFrom(trial: unknown) {
+  const parsed = questAwardSchema.extend({ penalty_cleared: z.literal(true) }).safeParse(trial);
+  return parsed.success ? parsed.data : null;
+}
 
 /** delete_workout reports no set_count, so it is optional for both paths. */
 export const workoutMutationSchema = z.object({

@@ -10,11 +10,14 @@
 --
 -- Then open the app: the day close runs on load and the report appears.
 --
+-- The simulated days are judged by Phase 2 rules (rules_from is wound back
+-- with the hunter), and any penalty left by a previous run is closed first.
+--
 -- With the defaults the hunter ends up looking like this, relative to today:
 --   -4  lived fully   -> cleared, +1 free point
---   -3  nothing       -> failed
+--   -3  lived fully   -> cleared, +1 free point
 --   -2  lived fully   -> cleared, +1 free point
---   -1  food only     -> failed (no workout, Study not done)
+--   -1  food only     -> failed: a Standard penalty waits for your choice
 --
 -- Scenario overrides are plain session settings:
 --   npm run sim:days -- --set sim.days_back=9 --set sim.lived={9,8,7}
@@ -22,14 +25,21 @@
 --   sim.days_back   integer    how far back the hunter is wound
 --   sim.lived       int array  day offsets lived in full
 --   sim.food_only   int array  day offsets with food but nothing else
+--   sim.mode        integer    penalty mode: 0 lenient, 1 standard, 2 hardcore
+--
+-- Two failed days in a row show an escalation:
+--   npm run sim:days -- --set 'sim.lived={4,3}' --set 'sim.food_only={2,1}'
 
 do $sim$
 declare
   c_days_back constant integer := coalesce(current_setting('sim.days_back', true)::integer, 4);
   c_lived constant integer[] :=
-    coalesce(nullif(current_setting('sim.lived', true), '')::integer[], array[4, 2]);
+    coalesce(nullif(current_setting('sim.lived', true), '')::integer[], array[4, 3, 2]);
   c_food_only constant integer[] :=
     coalesce(nullif(current_setting('sim.food_only', true), '')::integer[], array[1]);
+
+  c_mode constant text :=
+    (array['lenient', 'standard', 'hardcore'])[coalesce(current_setting('sim.mode', true)::integer, 1) + 1];
 
   v_user uuid;
   v_timezone text;
@@ -77,11 +87,34 @@ begin
   v_today := public.game_date_at(now(), v_timezone);
   select * into v_study from public.quests where user_id = v_user and title = 'Study';
 
+  if c_mode is null then
+    raise exception 'sim.mode must be 0 (lenient), 1 (standard) or 2 (hardcore)';
+  end if;
+
   -- Wind the hunter back and clear the watermark so close_days() has work.
+  -- The window is judged by Phase 2 rules, under the chosen penalty mode.
   update public.hunters
   set created_on = v_today - c_days_back,
+      rules_from = v_today - c_days_back,
       last_closed_on = null
   where user_id = v_user;
+
+  update public.hunter_target_history
+  set penalty_mode = c_mode
+  where user_id = v_user;
+  update public.hunter_target_history
+  set effective_on = v_today - c_days_back
+  where user_id = v_user
+    and effective_on = (select min(effective_on) from public.hunter_target_history where user_id = v_user)
+    and effective_on > v_today - c_days_back;
+
+  -- A previous run's penalty would block a new one (one open at a time):
+  -- close it, retire its trial, and reset the stones.
+  update public.penalties
+  set state = 'redeemed', resolved_at = now(), acknowledged_at = now()
+  where user_id = v_user
+    and state in ('pending_choice', 'trial_active', 'debt_active', 'weakened_active');
+  delete from public.redemption_stone_events where user_id = v_user;
 
   -- The quests have to have existed on those days too. The immutability
   -- trigger exists to stop the client doing this; a dev script may.
@@ -89,6 +122,9 @@ begin
   update public.quests
   set created_at = (v_today - c_days_back - 1)::timestamptz
   where user_id = v_user;
+  update public.quests
+  set archived_at = now()
+  where user_id = v_user and type = 'trial' and archived_at is null;
   execute 'alter table public.quests enable trigger quests_guard_immutable';
 
   -- Start the simulated window from a genuinely clean slate. The ledger rows
@@ -143,8 +179,8 @@ begin
   end loop;
 
   raise notice '----------------------------------------';
-  raise notice 'Hunter wound back to %. Open the app: close_days() settles % days.',
-    v_today - c_days_back, c_days_back;
+  raise notice 'Hunter wound back to % (% mode). Open the app: close_days() settles % days.',
+    v_today - c_days_back, c_mode, c_days_back;
   raise notice '----------------------------------------';
 end;
 $sim$;

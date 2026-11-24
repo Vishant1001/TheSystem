@@ -2,6 +2,7 @@ import { Navigate, Outlet } from 'react-router';
 import { systemCopy } from '../copy/system';
 import { useAuth } from '../features/auth/authContext';
 import { useHunterSnapshot } from '../lib/queries/hunterSnapshot';
+import { attentionGate } from '../lib/schemas';
 import { systemMessage } from '../lib/systemError';
 import { SystemErrorPanel, SystemLoading, SystemScreenState } from './SystemStates';
 
@@ -99,6 +100,21 @@ export function RequireReportAcknowledged() {
 
   if (data !== null && data !== undefined && data.unacknowledged_days > 0) {
     return <Navigate to="/report" replace />;
+  }
+  return <Outlet />;
+}
+
+/**
+ * Brief 3.5: after the report, a penalty that needs a choice or an
+ * acknowledgement blocks every other screen. Driven by the snapshot's
+ * attention block, so it fires after any refresh - including one that follows
+ * an award whose catch-up closed a failed day.
+ */
+export function RequirePenaltyResolved() {
+  const { data } = useHunterSnapshot();
+
+  if (data !== null && data !== undefined && attentionGate(data) === 'penalty') {
+    return <Navigate to="/penalty" replace />;
   }
   return <Outlet />;
 }

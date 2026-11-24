@@ -250,10 +250,22 @@ settle and the System Report has something to say.
 npm run sim:days
 ```
 
-By default it lives four days back: two fully lived (cleared, one free point
-each), one untouched (failed) and one with food only (failed). Open the app
-afterwards — the day close runs on load, the report appears, and a level-up
-crossed during the close raises the modal over it.
+By default it lives four days back: three fully lived (cleared, one free
+point each) and yesterday with food only (failed). The window is judged by
+Phase 2 rules, so open the app afterwards and you get the System Report, then
+the Penalty choice, then any level-up - in that order. A previous run's open
+penalty is closed first, so every run starts a fresh scenario.
+
+Useful scenarios for the Penalty Zone (`sim.mode`: 0 lenient, 1 standard,
+2 hardcore):
+
+| Scenario                  | Command                                                                       |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| Standard choice           | `npm run sim:days`                                                            |
+| Lenient auto-debt         | `npm run sim:days -- --set sim.mode=0`                                        |
+| Hardcore trial            | `npm run sim:days -- --set sim.mode=2`                                        |
+| Escalation (two failures) | `npm run sim:days -- --set 'sim.lived={4,3}' --set 'sim.food_only={2,1}'`     |
+| A stone, then a failure   | `npm run sim:days -- --set sim.days_back=8 --set 'sim.lived={8,7,6,5,4,3,2}'` |
 
 Override the scenario (quote the arrays, or PowerShell reads the braces):
 
