@@ -23,6 +23,8 @@ import {
   type PenaltyState,
 } from './penalty';
 import debtVectors from './testdata/debt-vectors.json';
+import penaltyVectors from './testdata/penalty-vectors.json';
+import type { Category, StatId } from './config';
 
 describe('penalty state machine (section 5, amended: no expired)', () => {
   it('has exactly the agreed states', () => {
@@ -303,6 +305,55 @@ describe('a hunter can never lose a level under debt (3.4)', () => {
         const repayment = debtRepayment(xp, remaining);
         expect(repayment).toBeLessThanOrEqual(xp);
         expect(xp - repayment).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+});
+
+describe('penalty parity vectors (SQL half: penalty_parity.sql)', () => {
+  it.each(penaltyVectors.trialCategory)('trial category: $note', (vector) => {
+    expect(
+      trialCategory(
+        vector.missed.map((category) => ({ category: category as Category, statTags: [] })),
+      ),
+    ).toBe(vector.expected);
+  });
+
+  it.each(penaltyVectors.weakenedStat)('weakened stat: $note', (vector) => {
+    expect(
+      weakenedStat(
+        vector.tags.map((statTags) => ({ category: 'life', statTags: statTags as StatId[] })),
+      ),
+    ).toBe(vector.expected);
+  });
+
+  it.each(penaltyVectors.failedDay)('failed day: $note', (vector) => {
+    const action = onFailedDay(
+      vector.open as OpenPenalty | null,
+      vector.mode as 'lenient' | 'standard' | 'hardcore',
+    );
+    const actual =
+      action.action === 'create'
+        ? {
+            action: 'create',
+            state: action.penalty.state,
+            debtRatePercent: action.penalty.debtRatePercent,
+          }
+        : action.action === 'escalate'
+          ? { action: 'escalate', state: 'debt_active', debtRatePercent: action.debtRatePercent }
+          : { action: 'none', state: null, debtRatePercent: null };
+    expect(actual).toEqual(vector.expected);
+  });
+
+  it('transitions: the allowed list is exactly canTransition', () => {
+    const allowed = new Set(penaltyVectors.transitions.allowed);
+    for (const from of PENALTY_STATES) {
+      for (const to of PENALTY_STATES) {
+        const key = `${from}>${to}`;
+        expect(canTransition(from, to, 'debt')).toBe(allowed.has(key));
+        if (key === penaltyVectors.transitions.reopenNeedsDebt) {
+          expect(canTransition(from, to, 'trial')).toBe(false);
+        }
       }
     }
   });

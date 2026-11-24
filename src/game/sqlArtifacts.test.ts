@@ -10,6 +10,11 @@ import safeZoneParityTest from '../../supabase/tests/safe_zone_parity.sql?raw';
 import dayStatusVectors from './testdata/day-status-vectors.json';
 import streakVectors from './testdata/streak-vectors.json';
 import safeZoneVectors from './testdata/safe-zone-vectors.json';
+import penaltyParityTest from '../../supabase/tests/penalty_parity.sql?raw';
+import levelCurveVectors from './testdata/level-curve-vectors.json';
+import debtVectors from './testdata/debt-vectors.json';
+import penaltyVectors from './testdata/penalty-vectors.json';
+import awardVectors from './testdata/award-vectors.json';
 
 /**
  * ADR-4 / C2 drift guard.
@@ -118,5 +123,28 @@ describe('generated safe zone parity test (Step 2.2)', () => {
     for (const vector of [...dayStatusVectors, ...streakVectors, ...safeZoneVectors.quota]) {
       expect(safeZoneParityTest).toContain(`-- ${vector.note}`);
     }
+  });
+});
+
+describe('generated penalty parity test (Step 2.3)', () => {
+  it('is marked as generated', () => {
+    expect(penaltyParityTest).toContain('GENERATED FILE - DO NOT EDIT BY HAND');
+  });
+
+  it('pins every level of the curve', () => {
+    expect(penaltyParityTest).toContain(`array[${levelCurveVectors.xpToNext.join(', ')}]`);
+  });
+
+  it('asserts every debt, penalty rule and award vector', () => {
+    const count = (pattern: RegExp) => [...penaltyParityTest.matchAll(pattern)].length;
+    expect(count(/if public\.debt_amount\(/g)).toBe(debtVectors.amount.length);
+    expect(count(/if public\.debt_repayment\(/g)).toBe(debtVectors.repayment.length);
+    expect(count(/public\.trial_category\(array/g)).toBe(penaltyVectors.trialCategory.length);
+    expect(count(/public\.weakened_stat_for\(array/g)).toBe(penaltyVectors.weakenedStat.length);
+    expect(count(/from public\.failed_day_action\(/g)).toBe(penaltyVectors.failedDay.length);
+    expect(count(/if public\.penalty_transition_allowed\('[a-z_]+', '[a-z_]+', 'debt'\)/g)).toBe(
+      36,
+    );
+    expect(count(/from public\.compute_award\(/g)).toBe(awardVectors.length);
   });
 });

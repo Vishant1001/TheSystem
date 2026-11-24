@@ -18,10 +18,10 @@ expected_tables(name) as (
     ('hunters'), ('hunter_target_history'), ('quests'), ('quest_completions'),
     ('food_entries'), ('workouts'), ('workout_sets'), ('xp_events'),
     ('stat_allocations'), ('daily_logs'), ('game_config'),
-    ('safe_periods'), ('redemption_stone_events')
+    ('safe_periods'), ('redemption_stone_events'), ('penalties')
 ),
--- The client surface: the 17 RPCs, plus the quests trigger function, which can
--- only ever run as a trigger.
+-- The client surface: exactly these 20 RPCs. Trigger functions are left out
+-- of the comparison: they can never be called directly.
 expected_client_functions(name) as (
   values
     ('acknowledge_report'), ('allocate_points'), ('close_days'), ('complete_quest'),
@@ -29,7 +29,7 @@ expected_client_functions(name) as (
     ('log_food'), ('log_workout'), ('onboard_hunter'), ('pending_report'),
     ('undo_completion'), ('update_hunter_profile'),
     ('start_safe_period'), ('end_safe_period'), ('update_hunter_rules'),
-    ('quests_guard_immutable')
+    ('choose_penalty'), ('acknowledge_penalty'), ('redeem_penalty')
 ),
 expected_config_keys(key) as (
   values
@@ -41,7 +41,7 @@ expected_config_keys(key) as (
 -- Objects created by the last migration; their presence means every migration
 -- before it ran too.
 latest_migration_functions(name) as (
-  values ('day_outcome'), ('safe_period_refusal'), ('update_hunter_rules')
+  values ('apply_award'), ('reverse_award'), ('choose_penalty'), ('hunter_level')
 ),
 
 -- ---------------------------------------------------------------------------
@@ -54,18 +54,19 @@ public_tables as (
   where n.nspname = 'public' and c.relkind = 'r'
 ),
 public_functions as (
-  select p.oid, p.proname::text as name, p.prosecdef, p.pronargs
+  select p.oid, p.proname::text as name, p.prosecdef, p.pronargs,
+         p.prorettype = 'trigger'::regtype as is_trigger
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public'
 ),
 authenticated_can_execute as (
   select distinct name from public_functions
-  where has_function_privilege('authenticated', oid, 'execute')
+  where has_function_privilege('authenticated', oid, 'execute') and not is_trigger
 ),
 anon_can_execute as (
   select distinct name from public_functions
-  where has_function_privilege('anon', oid, 'execute')
+  where has_function_privilege('anon', oid, 'execute') and not is_trigger
 ),
 -- Table privileges that differ from the design: authenticated may SELECT every
 -- table, INSERT and UPDATE only quests, DELETE nothing; anon may do nothing.
@@ -86,7 +87,7 @@ grant_violations as (
 
 checks(ord, check_name, passed, detail) as (
   -- 1 -----------------------------------------------------------------------
-  select 1, 'All 13 tables exist',
+  select 1, 'All 14 tables exist',
     not exists (select 1 from expected_tables e where e.name not in (select name from public_tables)),
     coalesce(
       'missing: ' || (select string_agg(e.name, ', ') from expected_tables e
@@ -135,7 +136,7 @@ checks(ord, check_name, passed, detail) as (
 
   -- 5 -----------------------------------------------------------------------
   union all
-  select 5, 'authenticated can EXECUTE exactly the 17 RPCs + trigger function',
+  select 5, 'authenticated can EXECUTE exactly the 20 RPCs',
     not exists (select name from expected_client_functions
                 except select name from authenticated_can_execute)
     and not exists (select name from authenticated_can_execute
@@ -152,11 +153,10 @@ checks(ord, check_name, passed, detail) as (
   -- 6 -----------------------------------------------------------------------
   union all
   select 6, 'anon can EXECUTE no RPC',
-    not exists (select name from anon_can_execute where name <> 'quests_guard_immutable'),
+    not exists (select name from anon_can_execute),
     coalesce(
-      'anon can run: ' || (select string_agg(name, ', ') from anon_can_execute
-                           where name <> 'quests_guard_immutable'),
-      'none (only the trigger function, which cannot be called directly)')
+      'anon can run: ' || (select string_agg(name, ', ') from anon_can_execute),
+      'none')
 
   -- 7 -----------------------------------------------------------------------
   union all
@@ -209,13 +209,22 @@ checks(ord, check_name, passed, detail) as (
       'missing: ' || (select string_agg(name, ', ') from (
         select name from latest_migration_functions
         except select name from public_functions) l),
-      'Safe Zones functions present (migration 20261123000300)')
+      'Penalty Zone functions present (migration 20261124000200)')
 
   -- 12 ----------------------------------------------------------------------
   union all
   select 12, 'Every hunter has a rules epoch (Phase 2 rules start date)',
     not exists (select 1 from public.hunters where rules_from is null),
     format('%s hunters, all with rules_from', (select count(*) from public.hunters))
+
+  -- 13 ----------------------------------------------------------------------
+  union all
+  select 13, 'At most one open penalty per hunter',
+    not exists (
+      select user_id from public.penalties
+      where state in ('pending_choice', 'trial_active', 'debt_active', 'weakened_active')
+      group by user_id having count(*) > 1),
+    format('%s penalties on record', (select count(*) from public.penalties))
 )
 
 select check_name, case when passed then 'PASS' else 'FAIL' end as status, detail

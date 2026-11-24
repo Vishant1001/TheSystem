@@ -336,6 +336,205 @@ $$;
 `;
 }
 
+export const PENALTY_PARITY_TEST_PATH = 'supabase/tests/penalty_parity.sql';
+
+function textArray(values) {
+  return values.length === 0
+    ? "'{}'::text[]"
+    : `array[${values.map((value) => `'${value}'`).join(', ')}]::text[]`;
+}
+
+function sqlNullable(value) {
+  return value === null || value === undefined ? 'null' : `'${value}'`;
+}
+
+/**
+ * Penalty Zone parity (Step 2.3): level curve, debt, penalty rules and the
+ * award pipeline. The same JSON drives levelCurveParity.test.ts,
+ * penalty.test.ts and award.test.ts.
+ */
+export function buildPenaltyParityTest({ curve, debt, penalty, award }) {
+  const amounts = debt.amount
+    .map((vector) =>
+      [
+        `  -- ${vector.note}`,
+        `  v_count := v_count + 1;`,
+        `  if public.debt_amount(${vector.ratePercent}, ${vector.level}) <> ${vector.expected} then`,
+        `    raise exception 'debt_amount mismatch (%): got %', ${sqlLiteral(vector.note)},`,
+        `      public.debt_amount(${vector.ratePercent}, ${vector.level});`,
+        `  end if;`,
+      ].join('\n'),
+    )
+    .join('\n\n');
+
+  const repayments = debt.repayment
+    .map((vector) =>
+      [
+        `  -- ${vector.note}`,
+        `  v_count := v_count + 1;`,
+        `  if public.debt_repayment(${vector.awardXp}, ${vector.remaining}) <> ${vector.expected} then`,
+        `    raise exception 'debt_repayment mismatch (%)', ${sqlLiteral(vector.note)};`,
+        `  end if;`,
+      ].join('\n'),
+    )
+    .join('\n\n');
+
+  const categories = penalty.trialCategory
+    .map((vector) =>
+      [
+        `  -- ${vector.note}`,
+        `  v_count := v_count + 1;`,
+        `  v_text := public.trial_category(${textArray(vector.missed)});`,
+        `  if v_text is distinct from '${vector.expected}' then`,
+        `    raise exception 'trial_category mismatch (%): got %', ${sqlLiteral(vector.note)}, v_text;`,
+        `  end if;`,
+      ].join('\n'),
+    )
+    .join('\n\n');
+
+  const stats = penalty.weakenedStat
+    .map((vector) =>
+      [
+        `  -- ${vector.note}`,
+        `  v_count := v_count + 1;`,
+        `  v_text := public.weakened_stat_for(${textArray(vector.tags.flat())});`,
+        `  if v_text is distinct from '${vector.expected}' then`,
+        `    raise exception 'weakened_stat_for mismatch (%): got %', ${sqlLiteral(vector.note)}, v_text;`,
+        `  end if;`,
+      ].join('\n'),
+    )
+    .join('\n\n');
+
+  const failedDays = penalty.failedDay
+    .map((vector) => {
+      const open = vector.open;
+      const { expected } = vector;
+      return [
+        `  -- ${vector.note}`,
+        `  v_count := v_count + 1;`,
+        `  select * into v_action from public.failed_day_action(`,
+        `    ${sqlNullable(open?.state)}, ${open ? String(open.escalated) : 'null'}, '${vector.mode}');`,
+        `  if v_action.action is distinct from '${expected.action}'`,
+        `     or v_action.state is distinct from ${sqlNullable(expected.state)}`,
+        `     or v_action.debt_rate_percent is distinct from ${expected.debtRatePercent ?? 'null'} then`,
+        `    raise exception 'failed_day_action mismatch (%): got %', ${sqlLiteral(vector.note)}, v_action;`,
+        `  end if;`,
+      ].join('\n');
+    })
+    .join('\n\n');
+
+  const states = [
+    'pending_choice',
+    'trial_active',
+    'debt_active',
+    'weakened_active',
+    'cleared',
+    'redeemed',
+  ];
+  const allowed = new Set(penalty.transitions.allowed);
+  const transitions = states
+    .flatMap((from) => states.map((to) => [from, to]))
+    .map(([from, to]) => {
+      const expected = allowed.has(`${from}>${to}`);
+      const extra =
+        `${from}>${to}` === penalty.transitions.reopenNeedsDebt
+          ? [
+              `  if public.penalty_transition_allowed('${from}', '${to}', 'trial') then`,
+              `    raise exception 'a cleared trial must never reopen';`,
+              `  end if;`,
+            ]
+          : [];
+      return [
+        `  v_count := v_count + 1;`,
+        `  if public.penalty_transition_allowed('${from}', '${to}', 'debt') is distinct from ${expected} then`,
+        `    raise exception 'transition % -> % should be ${expected ? 'allowed' : 'refused'}', '${from}', '${to}';`,
+        `  end if;`,
+        ...extra,
+      ].join('\n');
+    })
+    .join('\n');
+
+  const awards = award
+    .map((vector) => {
+      const { input, expected } = vector;
+      const statXp = { STR: 0, AGI: 0, VIT: 0, INT: 0, SENSE: 0, ...expected.statXp };
+      return [
+        `  -- ${vector.note}`,
+        `  v_count := v_count + 1;`,
+        `  select * into v_award from public.compute_award(`,
+        `    '${input.source}', ${input.fullXp}, ${input.capRoom}, '${JSON.stringify(input.stats)}'::jsonb,`,
+        `    ${sqlNullable(input.weakenedStat)}, ${input.debtRemaining});`,
+        `  if v_award.xp <> ${expected.xp} or v_award.capped is distinct from ${expected.capped}`,
+        `     or v_award.stat_xp <> '${JSON.stringify(statXp)}'::jsonb`,
+        `     or v_award.weakened is distinct from ${expected.weakened}`,
+        `     or v_award.repayment <> ${expected.repayment} then`,
+        `    raise exception 'compute_award mismatch (%): got %', ${sqlLiteral(vector.note)}, v_award;`,
+        `  end if;`,
+      ].join('\n');
+    })
+    .join('\n\n');
+
+  return `${GENERATED_HEADER}
+-- Penalty Zone parity (Phase 2, Step 2.3). Generated from
+--   src/game/testdata/level-curve-vectors.json -> xp_to_next (every level)
+--   src/game/testdata/debt-vectors.json        -> debt_amount, debt_repayment
+--   src/game/testdata/penalty-vectors.json     -> trial_category, weakened_stat_for,
+--                                                 failed_day_action, penalty_transition_allowed
+--   src/game/testdata/award-vectors.json       -> compute_award
+-- The same files drive the engine tests in src/game.
+
+do $$
+declare
+  v_expected integer[] := array[${curve.xpToNext.join(', ')}];
+  v_level integer;
+  v_actual integer;
+begin
+  for v_level in ${curve.startLevel} .. ${curve.startLevel} + cardinality(v_expected) - 1 loop
+    v_actual := public.xp_to_next(v_level);
+    if v_actual <> v_expected[v_level - ${curve.startLevel} + 1] then
+      raise exception 'xp_to_next(%) = %, expected %', v_level, v_actual,
+        v_expected[v_level - ${curve.startLevel} + 1];
+    end if;
+  end loop;
+  raise notice 'level curve parity: % levels passed', cardinality(v_expected);
+end;
+$$;
+
+do $$
+declare
+  v_count integer := 0;
+  v_text text;
+  v_action record;
+begin
+${amounts}
+
+${repayments}
+
+${categories}
+
+${stats}
+
+${failedDays}
+
+${transitions}
+
+  raise notice 'debt and penalty rule parity: % vectors passed', v_count;
+end;
+$$;
+
+do $$
+declare
+  v_count integer := 0;
+  v_award record;
+begin
+${awards}
+
+  raise notice 'award pipeline parity: % vectors passed', v_count;
+end;
+$$;
+`;
+}
+
 function main() {
   const config = JSON.parse(readFileSync(join(root, 'src/game/game-config.json'), 'utf8'));
   const vectors = JSON.parse(
@@ -358,6 +557,18 @@ function main() {
     'utf8',
   );
   console.log(`wrote ${SAFE_ZONE_PARITY_TEST_PATH}`);
+
+  writeFileSync(
+    join(root, PENALTY_PARITY_TEST_PATH),
+    buildPenaltyParityTest({
+      curve: readJson('src/game/testdata/level-curve-vectors.json'),
+      debt: readJson('src/game/testdata/debt-vectors.json'),
+      penalty: readJson('src/game/testdata/penalty-vectors.json'),
+      award: readJson('src/game/testdata/award-vectors.json'),
+    }),
+    'utf8',
+  );
+  console.log(`wrote ${PENALTY_PARITY_TEST_PATH}`);
 
   writeFileSync(join(root, CONFIG_MIGRATION_PATH), buildGameConfigMigration(config), 'utf8');
   writeFileSync(join(root, PARITY_TEST_PATH), buildGameDateParityTest(vectors, config), 'utf8');

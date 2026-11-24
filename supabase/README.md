@@ -19,6 +19,9 @@ any database — applying is your call.
 | `20261123000100_game_config_v2.sql`           | **Generated.** Phase 2 config seed (supersedes the Phase 1 seed by upsert)         |
 | `20261123000200_safe_zones_schema.sql`        | Rules epoch, versioned rules, `on_rest_days`, `safe_periods`, stones, day statuses |
 | `20261123000300_safe_zones_functions.sql`     | Rest/safe/streak/stone logic, Safe Zone RPCs, new `close_days`                     |
+| `20261124000100_penalty_zone_schema.sql`      | `penalties`, Phase 2 `xp_events` sources and links, trial quests                   |
+| `20261124000200_penalty_zone_functions.sql`   | Level curve in SQL, the award pipeline, penalties, catch-up before awards          |
+| `20261124000300_penalty_zone_snapshot.sql`    | Snapshot penalty and attention blocks, privileges                                  |
 
 Never edit a generated config migration by hand. Change
 `src/game/game-config.json`, then run `npm run gen:sql`. The newest config
@@ -96,6 +99,8 @@ a single file with `npm run db:sql -- supabase/tests/rls_proof.sql`.
   engine's `schedule.ts` is tested against.
 - `safe_zone_parity.sql` — **generated.** Day outcome, streak and stone,
   safe period start and quota vectors, shared with the engine tests.
+- `penalty_parity.sql` — **generated.** Every level of the curve, debt,
+  penalty selection and transitions, and the award pipeline.
 - `rls_proof.sql` — hunter A cannot read or write hunter B, the ledger rejects
   client writes, anonymous callers get nothing. Prints `RLS PROOF PASSED`.
 - `smoke_game_rules.sql` — the game rules end to end: rewards, undo, auto
@@ -104,6 +109,10 @@ a single file with `npm run db:sql -- supabase/tests/rls_proof.sql`.
 - `smoke_safe_zones.sql` — 45 simulated days (rest, safe, cleared, failed,
   the epoch, a rules change), stones at streak 7/14/21 and none past 3,
   versioned rules and the Safe Zone RPCs. Prints `SAFE ZONES PASSED`.
+- `smoke_penalty_zone.sql` — every option, trial expiry, repayment and
+  reopening, redeemed never reopens, both directions of the reopened-debt
+  race, one open penalty under 5 failures per mode, stones in every state,
+  the diet trial and the source x modifier matrix. Prints `PENALTY ZONE PASSED`.
 
 The test scripts run inside a transaction and end with `ROLLBACK`. They create
 throwaway `auth.users` rows, so run them against a local or test database.
@@ -160,6 +169,9 @@ short stable tokens — the client maps them to System copy, never shows them ra
 | `allocate_points(stat, points)`                                               | Appends a permanent allocation. Availability is checked client-side by the engine (ADR-5).                                                                                                                                                                                       | `UNKNOWN_STAT_TAG`, `POINTS_MUST_BE_POSITIVE`, `HUNTER_NOT_FOUND`                                                                                                                 |
 | `close_days()`                                                                | Closes every unclosed game day before today: settles the deferred calorie quest, tallies core quests, writes `daily_logs`, awards the daily clear, advances `last_closed_on`. Idempotent, locks the hunter row, closes at most 30 days per call and reports `more_pending` (G8). | `HUNTER_NOT_FOUND`                                                                                                                                                                |
 | `acknowledge_report()`                                                        | Marks every unacknowledged closed day as seen (G9).                                                                                                                                                                                                                              | —                                                                                                                                                                                 |
+| `choose_penalty(choice)`                                                      | Standard only: `trial`, `debt` (20 %) or `weakened` for the pending penalty.                                                                                                                                                                                                     | `NO_PENDING_CHOICE`, `INVALID_PENALTY_CHOICE`                                                                                                                                     |
+| `acknowledge_penalty()`                                                       | Marks a Lenient debt, a Hardcore trial or an escalation as seen.                                                                                                                                                                                                                 | —                                                                                                                                                                                 |
+| `redeem_penalty(id)`                                                          | Spends a Redemption Stone: debt forgiven, trial removed, Weakened ended. Not in Hardcore.                                                                                                                                                                                        | `PENALTY_NOT_FOUND`, `PENALTY_NOT_OPEN`, `STONES_FROZEN`, `NO_STONES`                                                                                                             |
 | `update_hunter_rules(penalty_mode, rest_days)`                                | Penalty mode and 0–2 rest weekdays, versioned from the next game day; diet targets carried forward.                                                                                                                                                                              | `HUNTER_NOT_FOUND`, `INVALID_PENALTY_MODE`, `INVALID_REST_DAYS`                                                                                                                   |
 | `start_safe_period(kind, days)`                                               | Sick/Travel for 1–7 days. Starts today if called before today's warning time, otherwise tomorrow (never before the rules epoch). Max 10 safe days in any rolling 30.                                                                                                             | `HUNTER_NOT_FOUND`, `INVALID_SAFE_KIND`, `SAFE_PERIOD_LENGTH`, `SAFE_PERIOD_OVERLAP`, `SAFE_QUOTA_EXCEEDED`                                                                       |
 | `end_safe_period(id)`                                                         | Ends a period from the next game day (a period not yet started is cancelled); unused days return to the quota.                                                                                                                                                                   | `SAFE_PERIOD_NOT_FOUND`, `SAFE_PERIOD_NOT_ACTIVE`                                                                                                                                 |
@@ -189,6 +201,39 @@ timezone west can never reopen a day that has already been sealed.
   the append-only `redemption_stone_events` (max 3 held, none in Hardcore).
 - `hunter_snapshot().safe_zones` carries today's and tomorrow's rules, the
   streak, stones held, current and upcoming safe periods and the bookable days.
+
+### Penalty Zone (Phase 2)
+
+**State machine** (enforced by the `penalties_guard_transition` trigger;
+`penalty_transition_allowed()` is the rule, parity-tested against
+`canTransition` in `src/game/penalty.ts`):
+
+```
+pending_choice ──► trial_active ──► cleared
+      │                 └─────────► debt_active (escalated: deadline passed or another failure)
+      ├──► debt_active ──► cleared ──► debt_active (only a debt, when a reversal takes a repayment back)
+      ├──► weakened_active ──► cleared (at the close of its 2nd day)
+      └──► any open state ──► redeemed (a stone; never reopens)
+```
+
+- **One open penalty** per hunter: a partial unique index. A failure while one
+  is open escalates a pending choice or a trial once (30 % debt); anything else
+  records nothing. Lenient starts as a 10 % debt, Hardcore as a trial.
+- **Award pipeline.** Every XP event is written by `apply_award()` (base, cap,
+  Weakened, debt repayment, insert) and undone by `reverse_award()`, which
+  also reverses the linked repayment. Debt left is derived from the repayment
+  events, never stored. Cap room counts only quest and workout awards and
+  their reversals.
+- **Catch-up before awards.** Every RPC that can award or reverse XP first
+  closes all pending game days (`catch_up_days`), so yesterday's penalty
+  always exists before today's first award. A reversal can therefore only
+  reopen a debt cleared today, while it is still the open penalty.
+- **Trials** are quests of `type = 'trial'`, linked to their penalty and
+  immutable to the client. The deadline is checked lazily before every close
+  and every award; a trial completion is final.
+- `hunter_snapshot()` carries `penalty`, `penalty_options` (the concrete
+  consequences for the choice screen), `weakened_stat_today` and an
+  `attention` block (report days, pending choice, pending acknowledgement).
 
 ### The Penalty Zone hook
 

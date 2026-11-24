@@ -361,8 +361,11 @@ begin
   if public.is_safe_on(v_user, v_today + 1) then
     raise exception 'M: tomorrow must no longer be safe after ending early';
   end if;
-  if (public.hunter_snapshot() -> 'safe_zones' ->> 'safe_days_bookable')::integer < 1 then
-    raise exception 'M: ending early should hand days back to the quota';
+  -- Checked on a free date so the result does not depend on the time of day
+  -- (before the warning hour the period started today and keeps today safe).
+  if public.safe_period_refusal_for(v_user, v_start + 20, 2) is not null then
+    raise exception 'M: ending early should hand days back to the quota (2 more days at +20): %',
+      public.safe_period_refusal_for(v_user, v_start + 20, 2);
   end if;
 
   v_error := null;

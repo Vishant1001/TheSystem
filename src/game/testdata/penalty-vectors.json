@@ -1,0 +1,103 @@
+{
+  "trialCategory": [
+    { "note": "a clear majority", "missed": ["life", "diet", "life"], "expected": "life" },
+    { "note": "diet beats life on a tie", "missed": ["life", "diet"], "expected": "diet" },
+    {
+      "note": "fitness beats both on a three-way tie",
+      "missed": ["life", "fitness", "diet"],
+      "expected": "fitness"
+    },
+    { "note": "a single missed quest", "missed": ["diet"], "expected": "diet" }
+  ],
+  "weakenedStat": [
+    {
+      "note": "every tag counts, including second tags",
+      "tags": [["STR", "VIT"], ["VIT"]],
+      "expected": "VIT"
+    },
+    {
+      "note": "VIT beats INT and SENSE on a tie",
+      "tags": [["SENSE", "INT"], ["VIT"]],
+      "expected": "VIT"
+    },
+    { "note": "STR beats AGI on a tie", "tags": [["AGI"], ["STR"]], "expected": "STR" },
+    {
+      "note": "a clear majority on a later stat",
+      "tags": [["SENSE"], ["SENSE", "STR"], ["INT"]],
+      "expected": "SENSE"
+    }
+  ],
+  "failedDay": [
+    {
+      "note": "Standard, nothing open: a pending choice",
+      "open": null,
+      "mode": "standard",
+      "expected": { "action": "create", "state": "pending_choice", "debtRatePercent": null }
+    },
+    {
+      "note": "Lenient, nothing open: a 10% debt",
+      "open": null,
+      "mode": "lenient",
+      "expected": { "action": "create", "state": "debt_active", "debtRatePercent": 10 }
+    },
+    {
+      "note": "Hardcore, nothing open: a Survival Trial",
+      "open": null,
+      "mode": "hardcore",
+      "expected": { "action": "create", "state": "trial_active", "debtRatePercent": null }
+    },
+    {
+      "note": "a closed penalty does not block a new one",
+      "open": { "state": "cleared", "escalated": true },
+      "mode": "standard",
+      "expected": { "action": "create", "state": "pending_choice", "debtRatePercent": null }
+    },
+    {
+      "note": "a pending choice escalates to a 30% debt",
+      "open": { "state": "pending_choice", "escalated": false },
+      "mode": "standard",
+      "expected": { "action": "escalate", "state": "debt_active", "debtRatePercent": 30 }
+    },
+    {
+      "note": "an active trial escalates to a 30% debt",
+      "open": { "state": "trial_active", "escalated": false },
+      "mode": "hardcore",
+      "expected": { "action": "escalate", "state": "debt_active", "debtRatePercent": 30 }
+    },
+    {
+      "note": "an escalated debt records nothing more",
+      "open": { "state": "debt_active", "escalated": true },
+      "mode": "standard",
+      "expected": { "action": "none", "state": null, "debtRatePercent": null }
+    },
+    {
+      "note": "a chosen debt records nothing more",
+      "open": { "state": "debt_active", "escalated": false },
+      "mode": "lenient",
+      "expected": { "action": "none", "state": null, "debtRatePercent": null }
+    },
+    {
+      "note": "an active Weakened records nothing more",
+      "open": { "state": "weakened_active", "escalated": false },
+      "mode": "standard",
+      "expected": { "action": "none", "state": null, "debtRatePercent": null }
+    }
+  ],
+  "transitions": {
+    "allowed": [
+      "pending_choice>trial_active",
+      "pending_choice>debt_active",
+      "pending_choice>weakened_active",
+      "pending_choice>redeemed",
+      "trial_active>cleared",
+      "trial_active>debt_active",
+      "trial_active>redeemed",
+      "debt_active>cleared",
+      "debt_active>redeemed",
+      "weakened_active>cleared",
+      "weakened_active>redeemed",
+      "cleared>debt_active"
+    ],
+    "reopenNeedsDebt": "cleared>debt_active"
+  }
+}

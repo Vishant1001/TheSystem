@@ -181,6 +181,92 @@ export type Database = {
         };
         Relationships: [];
       };
+      penalties: {
+        Row: {
+          acknowledged_at: string | null;
+          choice: string | null;
+          chosen_at: string | null;
+          created_at: string;
+          debt_amount: number | null;
+          debt_level: number | null;
+          debt_rate_percent: number | null;
+          escalated: boolean;
+          id: string;
+          missed_quests: NonNullable<Json>;
+          mode: string;
+          resolved_at: string | null;
+          state: string;
+          trial_category: string | null;
+          trial_deadline: string | null;
+          trial_quest_id: string | null;
+          trigger_day: string;
+          updated_at: string;
+          user_id: string;
+          weakened_from: string | null;
+          weakened_stat: string | null;
+          weakened_until: string | null;
+          penalty_json: Json | null;
+          penalty_options: Json | null;
+        };
+        ComputedFields: 'penalty_json' | 'penalty_options';
+        Insert: {
+          acknowledged_at?: string | null;
+          choice?: string | null;
+          chosen_at?: string | null;
+          created_at?: string;
+          debt_amount?: number | null;
+          debt_level?: number | null;
+          debt_rate_percent?: number | null;
+          escalated?: boolean;
+          id?: string;
+          missed_quests: NonNullable<Json>;
+          mode: string;
+          resolved_at?: string | null;
+          state: string;
+          trial_category?: string | null;
+          trial_deadline?: string | null;
+          trial_quest_id?: string | null;
+          trigger_day: string;
+          updated_at?: string;
+          user_id: string;
+          weakened_from?: string | null;
+          weakened_stat?: string | null;
+          weakened_until?: string | null;
+        };
+        Update: {
+          acknowledged_at?: string | null;
+          choice?: string | null;
+          chosen_at?: string | null;
+          created_at?: string;
+          debt_amount?: number | null;
+          debt_level?: number | null;
+          debt_rate_percent?: number | null;
+          escalated?: boolean;
+          id?: string;
+          missed_quests?: NonNullable<Json>;
+          mode?: string;
+          resolved_at?: string | null;
+          state?: string;
+          trial_category?: string | null;
+          trial_deadline?: string | null;
+          trial_quest_id?: string | null;
+          trigger_day?: string;
+          updated_at?: string;
+          user_id?: string;
+          weakened_from?: string | null;
+          weakened_stat?: string | null;
+          weakened_until?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'penalties_trial_quest_id_fkey';
+            columns: ['trial_quest_id'];
+            isOneToOne: false;
+            referencedRelation: 'quests';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       quest_completions: {
         Row: {
           completed_at: string;
@@ -231,6 +317,7 @@ export type Database = {
           id: string;
           is_core: boolean;
           on_rest_days: boolean;
+          penalty_id: string | null;
           schedule_days: number[] | null;
           sort_order: number;
           stat_tags: string[];
@@ -252,6 +339,7 @@ export type Database = {
           id?: string;
           is_core?: boolean;
           on_rest_days?: boolean;
+          penalty_id?: string | null;
           schedule_days?: number[] | null;
           sort_order?: number;
           stat_tags: string[];
@@ -272,6 +360,7 @@ export type Database = {
           id?: string;
           is_core?: boolean;
           on_rest_days?: boolean;
+          penalty_id?: string | null;
           schedule_days?: number[] | null;
           sort_order?: number;
           stat_tags?: string[];
@@ -282,7 +371,15 @@ export type Database = {
           unit?: string | null;
           user_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'quests_penalty_id_fkey';
+            columns: ['penalty_id'];
+            isOneToOne: false;
+            referencedRelation: 'penalties';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       redemption_stone_events: {
         Row: {
@@ -316,7 +413,15 @@ export type Database = {
           reason?: string;
           user_id?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'redemption_stone_events_penalty_fk';
+            columns: ['penalty_id'];
+            isOneToOne: false;
+            referencedRelation: 'penalties';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       safe_periods: {
         Row: {
@@ -451,6 +556,8 @@ export type Database = {
           id: string;
           int_xp: number;
           occurred_on: string;
+          penalty_id: string | null;
+          related_event_id: string | null;
           reverses_event_id: string | null;
           sense_xp: number;
           source_id: string | null;
@@ -458,6 +565,7 @@ export type Database = {
           str_xp: number;
           user_id: string;
           vit_xp: number;
+          weakened: boolean;
           xp: number;
         };
         ComputedFields: never;
@@ -470,6 +578,8 @@ export type Database = {
           id?: string;
           int_xp?: number;
           occurred_on: string;
+          penalty_id?: string | null;
+          related_event_id?: string | null;
           reverses_event_id?: string | null;
           sense_xp?: number;
           source_id?: string | null;
@@ -477,6 +587,7 @@ export type Database = {
           str_xp?: number;
           user_id: string;
           vit_xp?: number;
+          weakened?: boolean;
           xp?: number;
         };
         Update: {
@@ -488,6 +599,8 @@ export type Database = {
           id?: string;
           int_xp?: number;
           occurred_on?: string;
+          penalty_id?: string | null;
+          related_event_id?: string | null;
           reverses_event_id?: string | null;
           sense_xp?: number;
           source_id?: string | null;
@@ -495,9 +608,24 @@ export type Database = {
           str_xp?: number;
           user_id?: string;
           vit_xp?: number;
+          weakened?: boolean;
           xp?: number;
         };
         Relationships: [
+          {
+            foreignKeyName: 'xp_events_penalty_id_fkey';
+            columns: ['penalty_id'];
+            isOneToOne: false;
+            referencedRelation: 'penalties';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'xp_events_related_event_id_fkey';
+            columns: ['related_event_id'];
+            isOneToOne: false;
+            referencedRelation: 'xp_events';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'xp_events_reverses_event_id_fkey';
             columns: ['reverses_event_id'];
@@ -512,9 +640,24 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      acknowledge_penalty: { Args: Record<PropertyKey, never>; Returns: Json };
       acknowledge_report: { Args: Record<PropertyKey, never>; Returns: Json };
       active_completion_id: { Args: { p_day: string; p_quest_id: string }; Returns: string };
       allocate_points: { Args: { p_points: number; p_stat: string }; Returns: Json };
+      apply_award: {
+        Args: {
+          p_category: string;
+          p_day: string;
+          p_free_points?: number;
+          p_full_xp: number;
+          p_penalty_id?: string;
+          p_source: string;
+          p_source_id: string;
+          p_stats: Json;
+          p_user: string;
+        };
+        Returns: Json;
+      };
       assert_authenticated: { Args: Record<PropertyKey, never>; Returns: string };
       auto_quest_for: {
         Args: { p_day: string; p_tracking: string; p_user: string };
@@ -528,6 +671,7 @@ export type Database = {
           id: string;
           is_core: boolean;
           on_rest_days: boolean;
+          penalty_id: string | null;
           schedule_days: number[] | null;
           sort_order: number;
           stat_tags: string[];
@@ -557,8 +701,37 @@ export type Database = {
         };
         Returns: Json;
       };
+      capped_xp_on: {
+        Args: { p_category: string; p_day: string; p_user: string };
+        Returns: number;
+      };
+      catch_up_days: { Args: { p_user: string }; Returns: number };
+      choose_penalty: { Args: { p_choice: string }; Returns: Json };
+      clear_trial: {
+        Args: {
+          p_quest: Omit<
+            Database['public']['Tables']['quests']['Row'],
+            Database['public']['Tables']['quests']['ComputedFields']
+          >;
+          p_user: string;
+          p_value: number;
+        };
+        Returns: Json;
+      };
       close_days: { Args: Record<PropertyKey, never>; Returns: Json };
+      close_days_for: { Args: { p_user: string }; Returns: Json };
       complete_quest: { Args: { p_quest_id: string; p_value?: number }; Returns: Json };
+      compute_award: {
+        Args: {
+          p_cap_room: number;
+          p_debt_remaining: number;
+          p_full_xp: number;
+          p_source: string;
+          p_stats: Json;
+          p_weakened_stat: string;
+        };
+        Returns: Record<string, unknown>;
+      };
       compute_quest_award: {
         Args: {
           p_category: string;
@@ -588,6 +761,8 @@ export type Database = {
         };
         Returns: Record<string, unknown>;
       };
+      debt_amount: { Args: { p_level: number; p_rate_percent: number }; Returns: number };
+      debt_repayment: { Args: { p_award_xp: number; p_debt_remaining: number }; Returns: number };
       delete_food: { Args: { p_id: string }; Returns: Json };
       delete_workout: { Args: { p_id: string }; Returns: Json };
       earns_stone: {
@@ -606,6 +781,12 @@ export type Database = {
       evaluate_auto_kcal_range: { Args: { p_day: string; p_user: string }; Returns: Json };
       evaluate_auto_protein: { Args: { p_day: string; p_user: string }; Returns: Json };
       evaluate_auto_workout: { Args: { p_day: string; p_user: string }; Returns: Json };
+      evaluate_food_trial: { Args: { p_user: string }; Returns: Json };
+      expire_trials: { Args: { p_user: string }; Returns: number };
+      failed_day_action: {
+        Args: { p_mode: string; p_open_escalated: boolean; p_open_state: string };
+        Returns: Record<string, unknown>;
+      };
       game_config_int: { Args: { p_key: string }; Returns: number };
       game_config_value: { Args: { p_key: string }; Returns: Json };
       game_date_at: {
@@ -614,9 +795,11 @@ export type Database = {
       };
       game_today: { Args: Record<PropertyKey, never>; Returns: string };
       game_today_for: { Args: { p_user: string }; Returns: string };
+      hunter_level: { Args: { p_user: string }; Returns: number };
       hunter_snapshot: { Args: Record<PropertyKey, never>; Returns: Json };
       is_safe_on: { Args: { p_day: string; p_user: string }; Returns: boolean };
       is_valid_timezone: { Args: { p_timezone: string }; Returns: boolean };
+      level_from_total_xp: { Args: { p_total_xp: number }; Returns: number };
       log_food: { Args: { p_kcal: number; p_name: string; p_protein_g: number }; Returns: Json };
       log_workout: { Args: { p_notes: string; p_sets?: Json; p_title: string }; Returns: Json };
       next_streak: { Args: { p_effect: string; p_previous: number }; Returns: number };
@@ -629,6 +812,66 @@ export type Database = {
           p_timezone: string;
         };
         Returns: Json;
+      };
+      open_penalty: {
+        Args: { p_user: string };
+        Returns: {
+          acknowledged_at: string | null;
+          choice: string | null;
+          chosen_at: string | null;
+          created_at: string;
+          debt_amount: number | null;
+          debt_level: number | null;
+          debt_rate_percent: number | null;
+          escalated: boolean;
+          id: string;
+          missed_quests: NonNullable<Json>;
+          mode: string;
+          resolved_at: string | null;
+          state: string;
+          trial_category: string | null;
+          trial_deadline: string | null;
+          trial_quest_id: string | null;
+          trigger_day: string;
+          updated_at: string;
+          user_id: string;
+          weakened_from: string | null;
+          weakened_stat: string | null;
+          weakened_until: string | null;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'penalties';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
+      penalty_debt_remaining: { Args: { p_penalty_id: string }; Returns: number };
+      penalty_json: {
+        Args: {
+          p_penalty: Omit<
+            Database['public']['Tables']['penalties']['Row'],
+            Database['public']['Tables']['penalties']['ComputedFields']
+          >;
+        };
+        Returns: Json;
+      };
+      penalty_on_failed_day: {
+        Args: { p_day: string; p_missed: Json; p_mode: string; p_user: string };
+        Returns: Json;
+      };
+      penalty_options: {
+        Args: {
+          p_penalty: Omit<
+            Database['public']['Tables']['penalties']['Row'],
+            Database['public']['Tables']['penalties']['ComputedFields']
+          >;
+        };
+        Returns: Json;
+      };
+      penalty_transition_allowed: {
+        Args: { p_choice: string; p_from: string; p_to: string };
+        Returns: boolean;
       };
       pending_report: { Args: Record<PropertyKey, never>; Returns: Json };
       quest_on_board: {
@@ -659,6 +902,8 @@ export type Database = {
         Returns: boolean;
       };
       quest_xp_for: { Args: { p_difficulty: string }; Returns: number };
+      redeem_penalty: { Args: { p_penalty_id: string }; Returns: Json };
+      reverse_award: { Args: { p_event_id: string; p_user: string }; Returns: Json };
       reverse_quest_completion: {
         Args: { p_completion_id: string; p_user: string };
         Returns: Json;
@@ -684,8 +929,18 @@ export type Database = {
         Returns: string;
       };
       safe_start_for: { Args: { p_user: string }; Returns: string };
+      split_by_weight: {
+        Args: { p_minimum?: number; p_stats: Json; p_total: number };
+        Returns: Json;
+      };
+      start_debt: {
+        Args: { p_escalated: boolean; p_penalty_id: string; p_rate_percent: number };
+        Returns: undefined;
+      };
       start_safe_period: { Args: { p_days: number; p_kind: string }; Returns: Json };
+      start_trial: { Args: { p_penalty_id: string }; Returns: undefined };
       stones_held: { Args: { p_user: string }; Returns: number };
+      trial_category: { Args: { p_categories: string[] }; Returns: string };
       undo_completion: { Args: { p_completion_id: string }; Returns: Json };
       update_hunter_profile: {
         Args: {
@@ -701,7 +956,10 @@ export type Database = {
         Args: { p_penalty_mode: string; p_rest_days: number[] };
         Returns: Json;
       };
+      weakened_stat_for: { Args: { p_tags: string[] }; Returns: string };
+      weakened_stat_on: { Args: { p_day: string; p_user: string }; Returns: string };
       weekdays_are_distinct: { Args: { p_days: number[] }; Returns: boolean };
+      xp_to_next: { Args: { p_level: number }; Returns: number };
     };
     Enums: {
       [_ in never]: never;

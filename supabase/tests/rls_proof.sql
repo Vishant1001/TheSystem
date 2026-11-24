@@ -51,6 +51,16 @@ reset role;
 insert into public.redemption_stone_events (user_id, occurred_on, delta, reason, log_date)
 values ('22222222-2222-2222-2222-222222222222', current_date, 1, 'earned', current_date);
 
+-- Penalties only come from close_days(); the setup writes them as owner.
+insert into public.penalties (user_id, trigger_day, mode, state, missed_quests)
+values ('22222222-2222-2222-2222-222222222222', current_date - 1, 'standard', 'pending_choice',
+        '[{"quest_id": null, "title": "Study", "category": "life", "stat_tags": ["INT"]}]');
+insert into public.penalties (user_id, trigger_day, mode, state, missed_quests)
+values ('11111111-1111-1111-1111-111111111111', current_date - 1, 'standard', 'pending_choice',
+        '[{"quest_id": null, "title": "Study", "category": "life", "stat_tags": ["INT"]}]');
+select public.start_trial(id) from public.penalties
+where user_id = '11111111-1111-1111-1111-111111111111';
+
 -- ---------------------------------------------------------------------------
 -- Act as A and try to see or touch B.
 -- ---------------------------------------------------------------------------
@@ -104,6 +114,9 @@ begin
   select count(*) into v_count from public.redemption_stone_events where user_id = v_user_b;
   if v_count <> 0 then v_leaks := v_leaks || 'redemption_stone_events '; end if;
 
+  select count(*) into v_count from public.penalties where user_id = v_user_b;
+  if v_count <> 0 then v_leaks := v_leaks || 'penalties '; end if;
+
   if v_leaks <> '' then
     raise exception 'RLS LEAK: hunter A can read hunter B rows in: %', v_leaks;
   end if;
@@ -123,8 +136,8 @@ begin
   end if;
 
   select count(*) into v_count from public.quests;
-  if v_count <> 4 then
-    raise exception 'RLS LEAK: unfiltered select on quests returned % rows (expected A''s 4)', v_count;
+  if v_count <> 5 then
+    raise exception 'RLS LEAK: unfiltered select on quests returned % rows (expected A''s 4 + 1 trial)', v_count;
   end if;
 
   raise notice 'unfiltered selects return only the caller rows';
@@ -215,7 +228,12 @@ begin
     'delete from public.redemption_stone_events',
     'update public.hunter_target_history set penalty_mode = ''lenient''',
     'update public.daily_logs set status = ''cleared'', streak = 99',
-    'update public.hunters set rules_from = current_date + 365'
+    'update public.hunters set rules_from = current_date + 365',
+    format('insert into public.penalties (user_id, trigger_day, mode, state, missed_quests) values (%L, current_date, ''standard'', ''pending_choice'', ''[]'')', v_user_a),
+    'update public.penalties set state = ''redeemed''',
+    'delete from public.penalties',
+    'update public.xp_events set related_event_id = null',
+    'delete from public.quests'
   ]
   loop
     v_blocked := false;
@@ -228,6 +246,37 @@ begin
       raise exception 'SECURITY FAILURE: client ran a direct write: %', v_statement;
     end if;
   end loop;
+
+  -- 4c. A trial is a quest, but not one the client may create or touch.
+  v_blocked := false;
+  begin
+    insert into public.quests (
+      user_id, title, type, category, tracking, goal_type, target_value, stat_tags, difficulty
+    )
+    values (v_user_a, 'Fake trial', 'trial', 'life', 'manual', 'duration', 1, array['INT'], 'E');
+  exception when others then
+    v_blocked := true;
+  end;
+  if not v_blocked then
+    raise exception 'SECURITY FAILURE: client inserted a trial quest';
+  end if;
+
+  v_blocked := false;
+  begin
+    update public.quests set target_value = 1 where user_id = v_user_a and type = 'trial';
+  exception when others then
+    v_blocked := sqlerrm like 'TRIAL_IMMUTABLE%';
+  end;
+  if not v_blocked then
+    raise exception 'SECURITY FAILURE: client edited its own trial quest';
+  end if;
+
+  -- ...while editing an ordinary quest still works (the guard trigger runs
+  -- for the client even though no client role holds EXECUTE on it).
+  update public.quests set title = 'Study hard' where user_id = v_user_a and title = 'Study';
+  if not found then
+    raise exception 'a client could not edit its own quest';
+  end if;
 
   -- 5. A cannot complete one of B's quests, even knowing its id.
   --    Role switches go through EXECUTE so plpgsql runs them as utility
@@ -263,6 +312,20 @@ begin
   end;
   if not v_blocked then
     raise exception 'SECURITY FAILURE: hunter A could end a safe period owned by B';
+  end if;
+
+  -- 5c. Nor redeem B's penalty, even knowing its id.
+  execute 'reset role';
+  select id into v_quest_b from public.penalties where user_id = v_user_b limit 1;
+  execute 'set local role authenticated';
+  v_blocked := false;
+  begin
+    perform public.redeem_penalty(v_quest_b);
+  exception when others then
+    v_blocked := sqlerrm like 'PENALTY_NOT_FOUND%';
+  end;
+  if not v_blocked then
+    raise exception 'SECURITY FAILURE: hunter A could redeem a penalty owned by B';
   end if;
 
   -- 6. No internal helper is reachable from a client role.
@@ -302,7 +365,34 @@ begin
     'select public.safe_period_refusal(''{}''::date[], ''{}''::date[], ''{}''::date[], current_date, 1)',
     'select public.safe_period_refusal_for(''22222222-2222-2222-2222-222222222222''::uuid, current_date, 1)',
     'select public.safe_days_bookable(''22222222-2222-2222-2222-222222222222''::uuid, current_date)',
-    'select public.safe_start_for(''22222222-2222-2222-2222-222222222222''::uuid)'
+    'select public.safe_start_for(''22222222-2222-2222-2222-222222222222''::uuid)',
+    'select public.xp_to_next(1)',
+    'select public.level_from_total_xp(100)',
+    'select public.hunter_level(''22222222-2222-2222-2222-222222222222''::uuid)',
+    'select public.debt_amount(20, 1)',
+    'select public.debt_repayment(10, 10)',
+    'select public.trial_category(array[''life''])',
+    'select public.weakened_stat_for(array[''INT''])',
+    'select public.failed_day_action(null, false, ''standard'')',
+    'select public.penalty_transition_allowed(''cleared'', ''debt_active'', ''debt'')',
+    'select public.split_by_weight(10, ''[]''::jsonb, 0)',
+    'select public.compute_award(''quest'', 10, 10, ''[]''::jsonb, null, 0)',
+    'select public.capped_xp_on(''22222222-2222-2222-2222-222222222222''::uuid, current_date, ''life'')',
+    'select public.open_penalty(''22222222-2222-2222-2222-222222222222''::uuid)',
+    'select public.penalty_debt_remaining(gen_random_uuid())',
+    'select public.weakened_stat_on(''22222222-2222-2222-2222-222222222222''::uuid, current_date)',
+    'select public.apply_award(''22222222-2222-2222-2222-222222222222''::uuid, current_date, ''quest'', null, ''life'', 999, ''[]''::jsonb, 0, null)',
+    'select public.reverse_award(''22222222-2222-2222-2222-222222222222''::uuid, gen_random_uuid())',
+    'select public.start_trial(gen_random_uuid())',
+    'select public.start_debt(gen_random_uuid(), 30, true)',
+    'select public.penalty_on_failed_day(''22222222-2222-2222-2222-222222222222''::uuid, current_date, ''standard'', ''[]''::jsonb)',
+    'select public.expire_trials(''22222222-2222-2222-2222-222222222222''::uuid)',
+    'select public.close_days_for(''22222222-2222-2222-2222-222222222222''::uuid)',
+    'select public.catch_up_days(''22222222-2222-2222-2222-222222222222''::uuid)',
+    'select public.penalty_json(null::public.penalties)',
+    'select public.penalty_options(null::public.penalties)',
+    'select public.clear_trial(''22222222-2222-2222-2222-222222222222''::uuid, null::public.quests, null)',
+    'select public.evaluate_food_trial(''22222222-2222-2222-2222-222222222222''::uuid)'
   ]
   loop
     v_blocked := false;
@@ -401,7 +491,10 @@ begin
     'select public.log_food(''X'', 1, 1)',
     'select public.start_safe_period(''sick'', 1)',
     'select public.end_safe_period(gen_random_uuid())',
-    'select public.update_hunter_rules(''lenient'', ''{}''::smallint[])'
+    'select public.update_hunter_rules(''lenient'', ''{}''::smallint[])',
+    'select public.choose_penalty(''debt'')',
+    'select public.acknowledge_penalty()',
+    'select public.redeem_penalty(gen_random_uuid())'
   ]
   loop
     v_blocked := false;
@@ -432,10 +525,11 @@ declare
     'acknowledge_report', 'allocate_points', 'close_days', 'complete_quest',
     'delete_food', 'delete_workout', 'end_safe_period', 'game_today', 'hunter_snapshot',
     'log_food', 'log_workout', 'onboard_hunter', 'pending_report', 'start_safe_period',
-    'undo_completion', 'update_hunter_profile', 'update_hunter_rules'
+    'undo_completion', 'update_hunter_profile', 'update_hunter_rules',
+    'choose_penalty', 'acknowledge_penalty', 'redeem_penalty'
   ];
   -- A trigger function cannot be called directly, whatever its grant says.
-  v_trigger_functions text[] := array['quests_guard_immutable'];
+  v_trigger_functions text[] := array['quests_guard_immutable', 'penalties_guard_transition'];
   v_extra text;
   v_missing text;
   v_anon text;
