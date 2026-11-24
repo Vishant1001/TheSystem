@@ -67,6 +67,9 @@ values ('22222222-2222-2222-2222-222222222222', 'B secret lift', 'strength');
 insert into public.personal_records (user_id, exercise_id, pr_kind, value_centi, occurred_on, baseline)
 select '22222222-2222-2222-2222-222222222222', id, 'max_weight', 10000, current_date, true
 from public.exercises where name = 'B secret lift';
+insert into public.bosses (user_id, exercise_id, target_weight_kg, target_reps, difficulty)
+select '22222222-2222-2222-2222-222222222222', id, 100, 1, 'C'
+from public.exercises where name = 'B secret lift';
 
 -- ---------------------------------------------------------------------------
 -- Act as A and try to see or touch B.
@@ -129,6 +132,9 @@ begin
 
   select count(*) into v_count from public.personal_records where user_id = v_user_b;
   if v_count <> 0 then v_leaks := v_leaks || 'personal_records '; end if;
+
+  select count(*) into v_count from public.bosses where user_id = v_user_b;
+  if v_count <> 0 then v_leaks := v_leaks || 'bosses '; end if;
 
   if v_leaks <> '' then
     raise exception 'RLS LEAK: hunter A can read hunter B rows in: %', v_leaks;
@@ -262,7 +268,10 @@ begin
     'delete from public.exercises',
     format('insert into public.personal_records (user_id, exercise_id, pr_kind, value_centi, occurred_on, baseline) select %L, id, ''e1rm'', 99999, current_date, false from public.exercises limit 1', v_user_a),
     'update public.personal_records set value_centi = 1',
-    'delete from public.personal_records'
+    'delete from public.personal_records',
+    format('insert into public.bosses (user_id, exercise_id, target_weight_kg, target_reps, difficulty) select %L, id, 1, 1, ''S'' from public.exercises limit 1', v_user_a),
+    'update public.bosses set defeated_on = current_date',
+    'delete from public.bosses'
   ]
   loop
     v_blocked := false;
@@ -329,6 +338,18 @@ begin
   if not v_blocked then
     raise exception 'SECURITY FAILURE: a client changed the kind of an exercise';
   end if;
+  execute 'reset role';
+  select id into v_quest_b from public.exercises where user_id = v_user_b limit 1;
+  execute 'set local role authenticated';
+  v_blocked := false;
+  begin
+    update public.exercises set archived_at = now(), merged_into_id = v_quest_b where user_id = v_user_a;
+  exception when others then
+    v_blocked := sqlerrm like 'EXERCISE_IMMUTABLE%';
+  end;
+  if not v_blocked then
+    raise exception 'SECURITY FAILURE: a client linked its exercise to one owned by B';
+  end if;
 
   -- 5. A cannot complete one of B's quests, even knowing its id.
   --    Role switches go through EXECUTE so plpgsql runs them as utility
@@ -379,6 +400,44 @@ begin
   if not v_blocked then
     raise exception 'SECURITY FAILURE: hunter A could redeem a penalty owned by B';
   end if;
+
+  -- 5d. Nor edit or retire B's boss, nor merge or log B's custom exercise.
+  execute 'reset role';
+  select id into v_quest_b from public.bosses where user_id = v_user_b limit 1;
+  execute 'set local role authenticated';
+  foreach v_statement in array array[
+    format('select public.update_boss(%L, 1, 1, ''E'')', v_quest_b),
+    format('select public.archive_boss(%L)', v_quest_b)
+  ] loop
+    v_blocked := false;
+    begin
+      execute v_statement;
+    exception when others then
+      v_blocked := sqlerrm like 'BOSS_NOT_FOUND%';
+    end;
+    if not v_blocked then
+      raise exception 'SECURITY FAILURE: hunter A reached B''s boss: %', v_statement;
+    end if;
+  end loop;
+  execute 'reset role';
+  select id into v_quest_b from public.exercises where user_id = v_user_b limit 1;
+  execute 'set local role authenticated';
+  foreach v_statement in array array[
+    format('select public.merge_exercise(%L, (select id from public.exercises where user_id is null limit 1))', v_quest_b),
+    format('select public.create_boss(%L, 50, 1, ''E'')', v_quest_b),
+    format('select public.log_workout(''Sneaky'', null, %L::jsonb)',
+      jsonb_build_array(jsonb_build_object('exercise_id', v_quest_b, 'reps', 5)))
+  ] loop
+    v_blocked := false;
+    begin
+      execute v_statement;
+    exception when others then
+      v_blocked := sqlerrm like 'EXERCISE_NOT_FOUND%';
+    end;
+    if not v_blocked then
+      raise exception 'SECURITY FAILURE: hunter A used B''s custom exercise: %', v_statement;
+    end if;
+  end loop;
 
   -- 6. No internal helper is reachable from a client role.
   --
@@ -447,7 +506,21 @@ begin
     'select public.evaluate_food_trial(''22222222-2222-2222-2222-222222222222''::uuid)',
     'select public.to_centi(1.5)',
     'select public.e1rm_centi(10000, 5)',
-    'select public.pr_kind_allowed(''strength'')'
+    'select public.pr_kind_allowed(''strength'')',
+    'select public.stat_for_kind(''strength'')',
+    'select public.workout_set_xp(''[]''::jsonb, 0)',
+    'select public.detect_prs(''strength'', null, null, ''[]''::jsonb)',
+    'select public.payable_pr_bonuses(1, 0)',
+    'select public.defeats_boss(''strength'', 1, 1, ''working'', 1, 1)',
+    'select public.pr_best(''22222222-2222-2222-2222-222222222222''::uuid, gen_random_uuid(), ''e1rm'')',
+    'select public.pr_bonuses_paid_on(''22222222-2222-2222-2222-222222222222''::uuid, current_date)',
+    'select public.exercise_after_merges(null::public.exercises)',
+    'select public.resolve_exercise(''22222222-2222-2222-2222-222222222222''::uuid, null, ''Planted'')',
+    'select public.rebase_pr_baselines(''22222222-2222-2222-2222-222222222222''::uuid, gen_random_uuid())',
+    'select public.award_workout(''22222222-2222-2222-2222-222222222222''::uuid, null::public.workouts)',
+    'select public.reverse_workout_awards(''22222222-2222-2222-2222-222222222222''::uuid, gen_random_uuid())',
+    'select public.boss_json(null::public.bosses)',
+    'select public.assert_boss_fields(1, 1, ''E'', null)'
   ]
   loop
     v_blocked := false;
@@ -549,7 +622,11 @@ begin
     'select public.update_hunter_rules(''lenient'', ''{}''::smallint[])',
     'select public.choose_penalty(''debt'')',
     'select public.acknowledge_penalty()',
-    'select public.redeem_penalty(gen_random_uuid())'
+    'select public.redeem_penalty(gen_random_uuid())',
+    'select public.create_boss(gen_random_uuid(), 1, 1, ''E'')',
+    'select public.update_boss(gen_random_uuid(), 1, 1, ''E'')',
+    'select public.archive_boss(gen_random_uuid())',
+    'select public.merge_exercise(gen_random_uuid(), gen_random_uuid())'
   ]
   loop
     v_blocked := false;
@@ -581,7 +658,8 @@ declare
     'delete_food', 'delete_workout', 'end_safe_period', 'game_today', 'hunter_snapshot',
     'log_food', 'log_workout', 'onboard_hunter', 'pending_report', 'start_safe_period',
     'undo_completion', 'update_hunter_profile', 'update_hunter_rules',
-    'choose_penalty', 'acknowledge_penalty', 'redeem_penalty'
+    'choose_penalty', 'acknowledge_penalty', 'redeem_penalty',
+    'create_boss', 'update_boss', 'archive_boss', 'merge_exercise'
   ];
   -- A trigger function cannot be called directly, whatever its grant says.
   v_trigger_functions text[] := array[

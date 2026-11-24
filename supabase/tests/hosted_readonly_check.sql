@@ -19,9 +19,9 @@ expected_tables(name) as (
     ('food_entries'), ('workouts'), ('workout_sets'), ('xp_events'),
     ('stat_allocations'), ('daily_logs'), ('game_config'),
     ('safe_periods'), ('redemption_stone_events'), ('penalties'),
-    ('exercises'), ('personal_records')
+    ('exercises'), ('personal_records'), ('bosses')
 ),
--- The client surface: exactly these 20 RPCs. Trigger functions are left out
+-- The client surface: exactly these 24 RPCs. Trigger functions are left out
 -- of the comparison: they can never be called directly.
 expected_client_functions(name) as (
   values
@@ -30,7 +30,8 @@ expected_client_functions(name) as (
     ('log_food'), ('log_workout'), ('onboard_hunter'), ('pending_report'),
     ('undo_completion'), ('update_hunter_profile'),
     ('start_safe_period'), ('end_safe_period'), ('update_hunter_rules'),
-    ('choose_penalty'), ('acknowledge_penalty'), ('redeem_penalty')
+    ('choose_penalty'), ('acknowledge_penalty'), ('redeem_penalty'),
+    ('create_boss'), ('update_boss'), ('archive_boss'), ('merge_exercise')
 ),
 expected_config_keys(key) as (
   values
@@ -42,7 +43,7 @@ expected_config_keys(key) as (
 -- Objects created by the last migration; their presence means every migration
 -- before it ran too.
 latest_migration_functions(name) as (
-  values ('e1rm_centi'), ('pr_kind_allowed'), ('to_centi')
+  values ('award_workout'), ('detect_prs'), ('merge_exercise'), ('reverse_workout_awards')
 ),
 
 -- ---------------------------------------------------------------------------
@@ -89,7 +90,7 @@ grant_violations as (
 
 checks(ord, check_name, passed, detail) as (
   -- 1 -----------------------------------------------------------------------
-  select 1, 'All 16 tables exist',
+  select 1, 'All 17 tables exist',
     not exists (select 1 from expected_tables e where e.name not in (select name from public_tables)),
     coalesce(
       'missing: ' || (select string_agg(e.name, ', ') from expected_tables e
@@ -138,7 +139,7 @@ checks(ord, check_name, passed, detail) as (
 
   -- 5 -----------------------------------------------------------------------
   union all
-  select 5, 'authenticated can EXECUTE exactly the 20 RPCs',
+  select 5, 'authenticated can EXECUTE exactly the 24 RPCs',
     not exists (select name from expected_client_functions
                 except select name from authenticated_can_execute)
     and not exists (select name from authenticated_can_execute
@@ -211,7 +212,7 @@ checks(ord, check_name, passed, detail) as (
       'missing: ' || (select string_agg(name, ', ') from (
         select name from latest_migration_functions
         except select name from public_functions) l),
-      'Gym functions present (migration 20261125000300)')
+      'Gym reward functions present (migration 20261126000200)')
 
   -- 12 ----------------------------------------------------------------------
   union all

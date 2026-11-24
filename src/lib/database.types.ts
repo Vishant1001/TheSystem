@@ -23,6 +23,85 @@ export type Database = {
   };
   public: {
     Tables: {
+      bosses: {
+        Row: {
+          archived_at: string | null;
+          created_at: string;
+          defeated_on: string | null;
+          defeated_set_id: string | null;
+          defeated_workout_id: string | null;
+          difficulty: string;
+          exercise_id: string;
+          id: string;
+          name: string | null;
+          target_reps: number;
+          target_weight_kg: number;
+          user_id: string;
+          xp_event_id: string | null;
+          boss_json: Json | null;
+        };
+        ComputedFields: 'boss_json';
+        Insert: {
+          archived_at?: string | null;
+          created_at?: string;
+          defeated_on?: string | null;
+          defeated_set_id?: string | null;
+          defeated_workout_id?: string | null;
+          difficulty: string;
+          exercise_id: string;
+          id?: string;
+          name?: string | null;
+          target_reps: number;
+          target_weight_kg: number;
+          user_id: string;
+          xp_event_id?: string | null;
+        };
+        Update: {
+          archived_at?: string | null;
+          created_at?: string;
+          defeated_on?: string | null;
+          defeated_set_id?: string | null;
+          defeated_workout_id?: string | null;
+          difficulty?: string;
+          exercise_id?: string;
+          id?: string;
+          name?: string | null;
+          target_reps?: number;
+          target_weight_kg?: number;
+          user_id?: string;
+          xp_event_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'bosses_defeated_set_id_fkey';
+            columns: ['defeated_set_id'];
+            isOneToOne: false;
+            referencedRelation: 'workout_sets';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'bosses_defeated_workout_id_fkey';
+            columns: ['defeated_workout_id'];
+            isOneToOne: false;
+            referencedRelation: 'workouts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'bosses_exercise_id_fkey';
+            columns: ['exercise_id'];
+            isOneToOne: false;
+            referencedRelation: 'exercises';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'bosses_xp_event_id_fkey';
+            columns: ['xp_event_id'];
+            isOneToOne: false;
+            referencedRelation: 'xp_events';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       daily_logs: {
         Row: {
           acknowledged_at: string | null;
@@ -67,13 +146,30 @@ export type Database = {
           id: string;
           kind: string;
           mechanic: string | null;
+          merged_into_id: string | null;
           name: string;
           primary_muscles: string[];
           secondary_muscles: string[];
           source_id: string | null;
           user_id: string | null;
+          exercise_after_merges: {
+            archived_at: string | null;
+            category: string | null;
+            created_at: string;
+            equipment: string | null;
+            force: string | null;
+            id: string;
+            kind: string;
+            mechanic: string | null;
+            merged_into_id: string | null;
+            name: string;
+            primary_muscles: string[];
+            secondary_muscles: string[];
+            source_id: string | null;
+            user_id: string | null;
+          } | null;
         };
-        ComputedFields: never;
+        ComputedFields: 'exercise_after_merges';
         Insert: {
           archived_at?: string | null;
           category?: string | null;
@@ -83,6 +179,7 @@ export type Database = {
           id?: string;
           kind: string;
           mechanic?: string | null;
+          merged_into_id?: string | null;
           name: string;
           primary_muscles?: string[];
           secondary_muscles?: string[];
@@ -98,13 +195,22 @@ export type Database = {
           id?: string;
           kind?: string;
           mechanic?: string | null;
+          merged_into_id?: string | null;
           name?: string;
           primary_muscles?: string[];
           secondary_muscles?: string[];
           source_id?: string | null;
           user_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'exercises_merged_into_id_fkey';
+            columns: ['merged_into_id'];
+            isOneToOne: false;
+            referencedRelation: 'exercises';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       food_entries: {
         Row: {
@@ -663,6 +769,7 @@ export type Database = {
       };
       workouts: {
         Row: {
+          counted_sets: number;
           created_at: string;
           id: string;
           notes: string | null;
@@ -672,6 +779,7 @@ export type Database = {
         };
         ComputedFields: never;
         Insert: {
+          counted_sets?: number;
           created_at?: string;
           id?: string;
           notes?: string | null;
@@ -680,6 +788,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          counted_sets?: number;
           created_at?: string;
           id?: string;
           notes?: string | null;
@@ -801,7 +910,17 @@ export type Database = {
         };
         Returns: Json;
       };
+      archive_boss: { Args: { p_boss_id: string }; Returns: Json };
       assert_authenticated: { Args: Record<PropertyKey, never>; Returns: string };
+      assert_boss_fields: {
+        Args: {
+          p_difficulty: string;
+          p_name: string;
+          p_target_reps: number;
+          p_target_weight_kg: number;
+        };
+        Returns: undefined;
+      };
       auto_quest_for: {
         Args: { p_day: string; p_tracking: string; p_user: string };
         Returns: {
@@ -841,6 +960,25 @@ export type Database = {
           >;
           p_user: string;
           p_value?: number;
+        };
+        Returns: Json;
+      };
+      award_workout: {
+        Args: {
+          p_user: string;
+          p_workout: Omit<
+            Database['public']['Tables']['workouts']['Row'],
+            Database['public']['Tables']['workouts']['ComputedFields']
+          >;
+        };
+        Returns: Json;
+      };
+      boss_json: {
+        Args: {
+          p_boss: Omit<
+            Database['public']['Tables']['bosses']['Row'],
+            Database['public']['Tables']['bosses']['ComputedFields']
+          >;
         };
         Returns: Json;
       };
@@ -893,6 +1031,16 @@ export type Database = {
         };
         Returns: boolean;
       };
+      create_boss: {
+        Args: {
+          p_difficulty: string;
+          p_exercise_id: string;
+          p_name?: string;
+          p_target_reps: number;
+          p_target_weight_kg: number;
+        };
+        Returns: Json;
+      };
       daily_cap_for: { Args: { p_category: string }; Returns: number };
       day_outcome: {
         Args: {
@@ -906,8 +1054,23 @@ export type Database = {
       };
       debt_amount: { Args: { p_level: number; p_rate_percent: number }; Returns: number };
       debt_repayment: { Args: { p_award_xp: number; p_debt_remaining: number }; Returns: number };
+      defeats_boss: {
+        Args: {
+          p_boss_kind: string;
+          p_reps: number;
+          p_set_type: string;
+          p_target_reps: number;
+          p_target_weight_kg: number;
+          p_weight_kg: number;
+        };
+        Returns: boolean;
+      };
       delete_food: { Args: { p_id: string }; Returns: Json };
       delete_workout: { Args: { p_id: string }; Returns: Json };
+      detect_prs: {
+        Args: { p_kind: string; p_prior_e1rm: number; p_prior_max_weight: number; p_sets: Json };
+        Returns: Json;
+      };
       e1rm_centi: { Args: { p_reps: number; p_weight_centi: number }; Returns: number };
       earns_stone: {
         Args: { p_held: number; p_mode: string; p_streak_after: number; p_streak_before: number };
@@ -926,6 +1089,36 @@ export type Database = {
       evaluate_auto_protein: { Args: { p_day: string; p_user: string }; Returns: Json };
       evaluate_auto_workout: { Args: { p_day: string; p_user: string }; Returns: Json };
       evaluate_food_trial: { Args: { p_user: string }; Returns: Json };
+      exercise_after_merges: {
+        Args: {
+          p_exercise: Omit<
+            Database['public']['Tables']['exercises']['Row'],
+            Database['public']['Tables']['exercises']['ComputedFields']
+          >;
+        };
+        Returns: {
+          archived_at: string | null;
+          category: string | null;
+          created_at: string;
+          equipment: string | null;
+          force: string | null;
+          id: string;
+          kind: string;
+          mechanic: string | null;
+          merged_into_id: string | null;
+          name: string;
+          primary_muscles: string[];
+          secondary_muscles: string[];
+          source_id: string | null;
+          user_id: string | null;
+        };
+        SetofOptions: {
+          from: 'exercises';
+          to: 'exercises';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       expire_trials: { Args: { p_user: string }; Returns: number };
       failed_day_action: {
         Args: { p_mode: string; p_open_escalated: boolean; p_open_state: string };
@@ -946,6 +1139,10 @@ export type Database = {
       level_from_total_xp: { Args: { p_total_xp: number }; Returns: number };
       log_food: { Args: { p_kcal: number; p_name: string; p_protein_g: number }; Returns: Json };
       log_workout: { Args: { p_notes: string; p_sets?: Json; p_title: string }; Returns: Json };
+      merge_exercise: {
+        Args: { p_from_custom_id: string; p_into_exercise_id: string };
+        Returns: Json;
+      };
       next_streak: { Args: { p_effect: string; p_previous: number }; Returns: number };
       onboard_hunter: {
         Args: {
@@ -990,6 +1187,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      payable_pr_bonuses: { Args: { p_candidates: number; p_paid_today: number }; Returns: number };
       penalty_debt_remaining: { Args: { p_penalty_id: string }; Returns: number };
       penalty_json: {
         Args: {
@@ -1018,6 +1216,11 @@ export type Database = {
         Returns: boolean;
       };
       pending_report: { Args: Record<PropertyKey, never>; Returns: Json };
+      pr_best: {
+        Args: { p_exercise_id: string; p_pr_kind: string; p_user: string };
+        Returns: number;
+      };
+      pr_bonuses_paid_on: { Args: { p_day: string; p_user: string }; Returns: number };
       pr_kind_allowed: { Args: { p_kind: string }; Returns: boolean };
       quest_on_board: {
         Args: {
@@ -1047,12 +1250,39 @@ export type Database = {
         Returns: boolean;
       };
       quest_xp_for: { Args: { p_difficulty: string }; Returns: number };
+      rebase_pr_baselines: { Args: { p_exercise_id: string; p_user: string }; Returns: number };
       redeem_penalty: { Args: { p_penalty_id: string }; Returns: Json };
+      resolve_exercise: {
+        Args: { p_exercise_id: string; p_name: string; p_user: string };
+        Returns: {
+          archived_at: string | null;
+          category: string | null;
+          created_at: string;
+          equipment: string | null;
+          force: string | null;
+          id: string;
+          kind: string;
+          mechanic: string | null;
+          merged_into_id: string | null;
+          name: string;
+          primary_muscles: string[];
+          secondary_muscles: string[];
+          source_id: string | null;
+          user_id: string | null;
+        };
+        SetofOptions: {
+          from: '*';
+          to: 'exercises';
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
       reverse_award: { Args: { p_event_id: string; p_user: string }; Returns: Json };
       reverse_quest_completion: {
         Args: { p_completion_id: string; p_user: string };
         Returns: Json;
       };
+      reverse_workout_awards: { Args: { p_user: string; p_workout_id: string }; Returns: Json };
       safe_days_bookable: { Args: { p_start_on: string; p_user: string }; Returns: number };
       safe_effective_end: { Args: { p_end_on: string; p_ended_early_on: string }; Returns: string };
       safe_period_refusal: {
@@ -1084,10 +1314,21 @@ export type Database = {
       };
       start_safe_period: { Args: { p_days: number; p_kind: string }; Returns: Json };
       start_trial: { Args: { p_penalty_id: string }; Returns: undefined };
+      stat_for_kind: { Args: { p_kind: string }; Returns: string };
       stones_held: { Args: { p_user: string }; Returns: number };
       to_centi: { Args: { p_kg: number }; Returns: number };
       trial_category: { Args: { p_categories: string[] }; Returns: string };
       undo_completion: { Args: { p_completion_id: string }; Returns: Json };
+      update_boss: {
+        Args: {
+          p_boss_id: string;
+          p_difficulty: string;
+          p_name?: string;
+          p_target_reps: number;
+          p_target_weight_kg: number;
+        };
+        Returns: Json;
+      };
       update_hunter_profile: {
         Args: {
           p_hunter_name: string;
@@ -1105,6 +1346,10 @@ export type Database = {
       weakened_stat_for: { Args: { p_tags: string[] }; Returns: string };
       weakened_stat_on: { Args: { p_day: string; p_user: string }; Returns: string };
       weekdays_are_distinct: { Args: { p_days: number[] }; Returns: boolean };
+      workout_set_xp: {
+        Args: { p_counted_today: number; p_sets: Json };
+        Returns: Record<string, unknown>;
+      };
       xp_to_next: { Args: { p_level: number }; Returns: number };
     };
     Enums: {

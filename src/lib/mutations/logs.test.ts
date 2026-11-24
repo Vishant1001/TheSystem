@@ -42,6 +42,24 @@ describe('log_workout payload', () => {
   });
 });
 
+describe('log_workout payload since Step 2.6', () => {
+  it('still parses with the gym reward fields added', () => {
+    const parsed = workoutMutationSchema.parse({
+      workout_id: '00000000-0000-0000-0000-00000000000e',
+      occurred_on: '2026-11-25',
+      set_count: 3,
+      auto_workout: { evaluated: true, action: 'unchanged' },
+      counted_sets: 3,
+      workout_award: { xp: 6, source: 'workout', capped: false },
+      records: [],
+      pr_bonuses: [],
+      bosses_defeated: [],
+    });
+    expect(parsed.set_count).toBe(3);
+    expect(awardFromOutcome(parsed.auto_workout)).toBeNull();
+  });
+});
+
 describe('delete_workout payload', () => {
   it('parses without a set_count and with a reversal result', () => {
     const parsed = workoutMutationSchema.parse({

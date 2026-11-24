@@ -189,10 +189,24 @@ describe('generated exercise library seed (Step 2.5)', () => {
   });
 });
 
-describe('generated gym parity test (Step 2.5: e1RM)', () => {
-  it('asserts every e1RM vector', () => {
-    expect([...gymParityTest.matchAll(/public\.e1rm_centi\(/g)]).toHaveLength(
-      gymVectors.e1rm.length,
-    );
+describe('generated gym parity test (Steps 2.5-2.6)', () => {
+  const count = (pattern: RegExp) => [...gymParityTest.matchAll(pattern)].length;
+
+  it('is marked as generated', () => {
+    expect(gymParityTest).toContain('GENERATED FILE - DO NOT EDIT BY HAND');
+  });
+
+  it('asserts every e1RM, PR, bonus limit, set XP and boss vector', () => {
+    expect(count(/public\.e1rm_centi\(/g)).toBe(gymVectors.e1rm.length);
+    expect(count(/public\.detect_prs\(/g)).toBe(gymVectors.prs.length);
+    expect(count(/public\.payable_pr_bonuses\(/g)).toBe(gymVectors.payableBonuses.length);
+    expect(count(/public\.workout_set_xp\(/g)).toBe(gymVectors.setXp.length);
+    expect(count(/public\.defeats_boss\(/g)).toBe(gymVectors.bosses.length);
+  });
+
+  it('carries the hand-written notes', () => {
+    for (const vector of [...gymVectors.prs, ...gymVectors.setXp, ...gymVectors.bosses]) {
+      expect(gymParityTest).toContain(`-- ${vector.note}`);
+    }
   });
 });

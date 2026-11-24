@@ -602,19 +602,97 @@ on conflict (source_id) where user_id is null do update
 }
 
 /** Gym parity (2.5: e1RM; 2.6 adds PR detection, set XP and bosses). */
+const SET_TYPE_LETTERS = { w: 'warmup', s: 'working' };
+const KIND_LETTERS = { S: 'strength', C: 'cardio', M: 'mobility' };
+
+function jsonLiteral(value) {
+  return `'${JSON.stringify(value).replaceAll("'", "''")}'::jsonb`;
+}
+
+/** The engine's PR detection result in the SQL reply's snake_case shape. */
+function sqlPrDetection(expected) {
+  return {
+    records: expected.records.map((record) => ({
+      pr_kind: record.prKind,
+      value_centi: record.valueCentiKg,
+      set_index: record.setIndex,
+      baseline: record.baseline,
+    })),
+    bonus_set_indexes: expected.bonusSetIndexes,
+  };
+}
+
+function sqlLoggedSets(sets) {
+  return sets.map((set) => ({ set_type: set.setType, reps: set.reps, weight_kg: set.weightKg }));
+}
+
+/**
+ * Gym parity (Steps 2.5-2.6): e1RM, PR detection, the daily PR bonus limit,
+ * set XP and boss defeats. The same JSON drives gym.test.ts.
+ */
 export function buildGymParityTest({ gym }) {
-  const e1rm = gym.e1rm
-    .map((vector) =>
-      [
-        `  -- ${vector.note}`,
-        `  v_count := v_count + 1;`,
-        `  v_actual := public.e1rm_centi(${vector.weightCentiKg}, ${vector.reps});`,
-        `  if v_actual is distinct from ${vector.expected === null ? 'null' : vector.expected} then`,
-        `    raise exception 'e1rm_centi mismatch (%): got %', ${sqlLiteral(vector.note)}, v_actual;`,
-        `  end if;`,
-      ].join('\n'),
-    )
-    .join('\n\n');
+  const block = (lines) => lines.join('\n');
+  const e1rm = gym.e1rm.map((vector) =>
+    block([
+      `  -- ${vector.note}`,
+      `  v_count := v_count + 1;`,
+      `  v_actual := public.e1rm_centi(${vector.weightCentiKg}, ${vector.reps});`,
+      `  if v_actual is distinct from ${vector.expected === null ? 'null' : vector.expected} then`,
+      `    raise exception 'e1rm_centi mismatch (%): got %', ${sqlLiteral(vector.note)}, v_actual;`,
+      `  end if;`,
+    ]),
+  );
+  const prs = gym.prs.map((vector) =>
+    block([
+      `  -- ${vector.note}`,
+      `  v_count := v_count + 1;`,
+      `  v_json := public.detect_prs(${sqlLiteral(vector.kind)}, ${vector.prior.e1rm ?? 'null'}, ${vector.prior.maxWeight ?? 'null'},`,
+      `    ${jsonLiteral(sqlLoggedSets(vector.sets))});`,
+      `  if v_json is distinct from ${jsonLiteral(sqlPrDetection(vector.expected))} then`,
+      `    raise exception 'detect_prs mismatch (%): got %', ${sqlLiteral(vector.note)}, v_json;`,
+      `  end if;`,
+    ]),
+  );
+  const payable = gym.payableBonuses.map((vector) =>
+    block([
+      `  v_count := v_count + 1;`,
+      `  v_actual := public.payable_pr_bonuses(${vector.candidates}, ${vector.alreadyPaidToday});`,
+      `  if v_actual is distinct from ${vector.expected} then`,
+      `    raise exception 'payable_pr_bonuses(${vector.candidates}, ${vector.alreadyPaidToday}) mismatch: got %', v_actual;`,
+      `  end if;`,
+    ]),
+  );
+  const setXp = gym.setXp.map((vector) => {
+    const sets = vector.sets
+      .split(' ')
+      .map((token) => ({ kind: KIND_LETTERS[token[1]], set_type: SET_TYPE_LETTERS[token[0]] }));
+    return block([
+      `  -- ${vector.note}`,
+      `  v_count := v_count + 1;`,
+      `  select * into v_set_xp from public.workout_set_xp(${jsonLiteral(sets)}, ${vector.countedToday});`,
+      `  if v_set_xp.counted_sets is distinct from ${vector.expected.countedSets}`,
+      `     or v_set_xp.full_xp is distinct from ${vector.expected.fullXp}`,
+      `     or v_set_xp.stats is distinct from ${jsonLiteral(vector.expected.stats)} then`,
+      `    raise exception 'workout_set_xp mismatch (%): got %', ${sqlLiteral(vector.note)}, v_set_xp;`,
+      `  end if;`,
+    ]);
+  });
+  const bosses = gym.bosses.map((vector) =>
+    block([
+      `  -- ${vector.note}`,
+      `  v_count := v_count + 1;`,
+      `  if public.defeats_boss(${sqlLiteral(vector.boss.kind)}, ${vector.boss.targetWeightKg}, ${vector.boss.targetReps},`,
+      `       ${sqlLiteral(vector.set.setType)}, ${vector.set.reps ?? 'null'}, ${vector.set.weightKg ?? 'null'})`,
+      `     is distinct from ${vector.expected} then`,
+      `    raise exception 'defeats_boss mismatch (%)', ${sqlLiteral(vector.note)};`,
+      `  end if;`,
+    ]),
+  );
+
+  const section = (title, items, label) => `  -- ${title}
+  v_count := 0;
+${items.join('\n\n')}
+  raise notice '${label}: % vectors passed', v_count;`;
 
   return `${GENERATED_HEADER}
 -- Gym parity. Generated from src/game/testdata/gym-vectors.json, the same
@@ -624,10 +702,18 @@ do $$
 declare
   v_count integer := 0;
   v_actual integer;
+  v_json jsonb;
+  v_set_xp record;
 begin
-${e1rm}
+${section('e1RM (Epley, centi-kg, half up)', e1rm, 'e1RM parity')}
 
-  raise notice 'e1RM parity: % vectors passed', v_count;
+${section('PR detection', prs, 'PR detection parity')}
+
+${section('PR bonuses payable today (max per game day)', payable, 'PR bonus limit parity')}
+
+${section('Set XP', setXp, 'set XP parity')}
+
+${section('Boss defeats', bosses, 'boss parity')}
 end;
 $$;
 `;
