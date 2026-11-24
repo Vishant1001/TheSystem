@@ -535,6 +535,104 @@ $$;
 `;
 }
 
+export const EXERCISE_LIBRARY_MIGRATION_PATH =
+  'supabase/migrations/20261125000200_exercise_library.sql';
+export const GYM_PARITY_TEST_PATH = 'supabase/tests/gym_parity.sql';
+
+function quote(value) {
+  return value === null ? 'null' : `'${String(value).replaceAll("'", "''")}'`;
+}
+
+function textList(values) {
+  return values.length === 0 ? "'{}'::text[]" : `array[${values.map(quote).join(', ')}]::text[]`;
+}
+
+/**
+ * Seed of the global exercise library (brief 4.1) from the committed,
+ * trimmed free-exercise-db snapshot. The XP kind comes from the config's
+ * category mapping; an unknown category stops the generator.
+ */
+export function buildExerciseLibraryMigration(library, config) {
+  const kinds = config.gym.libraryCategoryKinds;
+  const rows = library.exercises.map((exercise) => {
+    const kind = kinds[exercise.category];
+    if (kind === undefined) {
+      throw new Error(`no XP kind for library category "${exercise.category}" (${exercise.id})`);
+    }
+    return `  (${[
+      quote(exercise.id),
+      quote(exercise.name),
+      quote(exercise.category),
+      quote(kind),
+      quote(exercise.equipment),
+      textList(exercise.primaryMuscles),
+      textList(exercise.secondaryMuscles),
+      quote(exercise.mechanic),
+      quote(exercise.force),
+    ].join(', ')})`;
+  });
+
+  return `-- GENERATED FILE - DO NOT EDIT BY HAND.
+-- Source: supabase/data/exercise-library.json (+ src/game/game-config.json for kinds)
+-- Regenerate: npm run gen:sql
+--
+-- The global exercise library (brief 4.1): ${library.exercises.length} exercises from
+-- ${library.source.repository}
+-- at commit ${library.source.commit} (${library.source.license}).
+-- Trimmed to: ${library.source.trimmed}. No images, no runtime fetching.
+--
+-- Library rows have no owner (user_id null) and are keyed by their source id,
+-- so re-running updates names and metadata in place. The kind is immutable
+-- once seeded.
+
+insert into public.exercises (
+  source_id, name, category, kind, equipment, primary_muscles, secondary_muscles, mechanic, force
+)
+values
+${rows.join(',\n')}
+on conflict (source_id) where user_id is null do update
+  set name = excluded.name,
+      category = excluded.category,
+      equipment = excluded.equipment,
+      primary_muscles = excluded.primary_muscles,
+      secondary_muscles = excluded.secondary_muscles,
+      mechanic = excluded.mechanic,
+      force = excluded.force;
+`;
+}
+
+/** Gym parity (2.5: e1RM; 2.6 adds PR detection, set XP and bosses). */
+export function buildGymParityTest({ gym }) {
+  const e1rm = gym.e1rm
+    .map((vector) =>
+      [
+        `  -- ${vector.note}`,
+        `  v_count := v_count + 1;`,
+        `  v_actual := public.e1rm_centi(${vector.weightCentiKg}, ${vector.reps});`,
+        `  if v_actual is distinct from ${vector.expected === null ? 'null' : vector.expected} then`,
+        `    raise exception 'e1rm_centi mismatch (%): got %', ${sqlLiteral(vector.note)}, v_actual;`,
+        `  end if;`,
+      ].join('\n'),
+    )
+    .join('\n\n');
+
+  return `${GENERATED_HEADER}
+-- Gym parity. Generated from src/game/testdata/gym-vectors.json, the same
+-- file gym.test.ts runs against the engine.
+
+do $$
+declare
+  v_count integer := 0;
+  v_actual integer;
+begin
+${e1rm}
+
+  raise notice 'e1RM parity: % vectors passed', v_count;
+end;
+$$;
+`;
+}
+
 function main() {
   const config = JSON.parse(readFileSync(join(root, 'src/game/game-config.json'), 'utf8'));
   const vectors = JSON.parse(
@@ -569,6 +667,20 @@ function main() {
     'utf8',
   );
   console.log(`wrote ${PENALTY_PARITY_TEST_PATH}`);
+
+  writeFileSync(
+    join(root, EXERCISE_LIBRARY_MIGRATION_PATH),
+    buildExerciseLibraryMigration(readJson('supabase/data/exercise-library.json'), config),
+    'utf8',
+  );
+  console.log(`wrote ${EXERCISE_LIBRARY_MIGRATION_PATH}`);
+
+  writeFileSync(
+    join(root, GYM_PARITY_TEST_PATH),
+    buildGymParityTest({ gym: readJson('src/game/testdata/gym-vectors.json') }),
+    'utf8',
+  );
+  console.log(`wrote ${GYM_PARITY_TEST_PATH}`);
 
   writeFileSync(join(root, CONFIG_MIGRATION_PATH), buildGameConfigMigration(config), 'utf8');
   writeFileSync(join(root, PARITY_TEST_PATH), buildGameDateParityTest(vectors, config), 'utf8');

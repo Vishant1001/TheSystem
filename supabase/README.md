@@ -22,6 +22,9 @@ any database — applying is your call.
 | `20261124000100_penalty_zone_schema.sql`      | `penalties`, Phase 2 `xp_events` sources and links, trial quests                   |
 | `20261124000200_penalty_zone_functions.sql`   | Level curve in SQL, the award pipeline, penalties, catch-up before awards          |
 | `20261124000300_penalty_zone_snapshot.sql`    | Snapshot penalty and attention blocks, privileges                                  |
+| `20261125000100_gym_schema.sql`               | `exercises`, `personal_records`, the `workout_sets` upgrade (non-destructive)      |
+| `20261125000200_exercise_library.sql`         | **Generated.** The global exercise library (876 rows)                              |
+| `20261125000300_gym_legacy_backfill.sql`      | e1RM in SQL; Phase 1 sets linked to exercises; PR baselines, no XP                 |
 
 Never edit a generated config migration by hand. Change
 `src/game/game-config.json`, then run `npm run gen:sql`. The newest config
@@ -101,6 +104,8 @@ a single file with `npm run db:sql -- supabase/tests/rls_proof.sql`.
   safe period start and quota vectors, shared with the engine tests.
 - `penalty_parity.sql` — **generated.** Every level of the curve, debt,
   penalty selection and transitions, and the award pipeline.
+- `gym_parity.sql` — **generated.** e1RM vectors (PR, set XP and boss
+  vectors join in 2.6).
 - `rls_proof.sql` — hunter A cannot read or write hunter B, the ledger rejects
   client writes, anonymous callers get nothing. Prints `RLS PROOF PASSED`.
 - `smoke_game_rules.sql` — the game rules end to end: rewards, undo, auto
@@ -234,6 +239,42 @@ pending_choice ──► trial_active ──► cleared
 - `hunter_snapshot()` carries `penalty`, `penalty_options` (the concrete
   consequences for the choice screen), `weakened_stat_today` and an
   `attention` block (report days, pending choice, pending acknowledgement).
+
+### Exercise library (Phase 2)
+
+`data/exercise-library.json` is a trimmed snapshot of
+[free-exercise-db](https://github.com/yuhonas/free-exercise-db) at commit
+`f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5`, released under **The Unlicense**
+(a public domain dedication). It keeps id, name, category, equipment, primary
+and secondary muscles, mechanic and force - no images, nothing fetched at
+runtime. `npm run gen:sql` turns it into the seed migration; each library
+category maps to an XP kind (strength, cardio or mobility) in
+`game-config.json`, and an unknown category stops the generator.
+
+- Library rows have `user_id` null and are readable by every signed-in
+  hunter; custom exercises belong to their hunter (create, rename, archive).
+  An exercise's kind never changes once created.
+- The gym migration linked every Phase 1 set to an exercise by
+  case-insensitive exact name, created a custom exercise for every name the
+  library does not know, and recorded each exercise's Phase 1 bests as PR
+  **baselines** with no XP. `exercise_name` is kept as logged.
+- Rehearse it on Phase 1-style history (local only):
+
+  ```powershell
+  npx supabase db reset --version 20261124000300
+  ```
+
+  ```powershell
+  npm run db:sql -- supabase/dev/rehearsal_gym_seed.sql
+  ```
+
+  ```powershell
+  npx supabase migration up
+  ```
+
+  ```powershell
+  npm run db:sql -- supabase/dev/rehearsal_gym_check.sql
+  ```
 
 ### The Penalty Zone hook
 

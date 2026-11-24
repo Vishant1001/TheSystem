@@ -18,7 +18,8 @@ expected_tables(name) as (
     ('hunters'), ('hunter_target_history'), ('quests'), ('quest_completions'),
     ('food_entries'), ('workouts'), ('workout_sets'), ('xp_events'),
     ('stat_allocations'), ('daily_logs'), ('game_config'),
-    ('safe_periods'), ('redemption_stone_events'), ('penalties')
+    ('safe_periods'), ('redemption_stone_events'), ('penalties'),
+    ('exercises'), ('personal_records')
 ),
 -- The client surface: exactly these 20 RPCs. Trigger functions are left out
 -- of the comparison: they can never be called directly.
@@ -41,7 +42,7 @@ expected_config_keys(key) as (
 -- Objects created by the last migration; their presence means every migration
 -- before it ran too.
 latest_migration_functions(name) as (
-  values ('apply_award'), ('reverse_award'), ('choose_penalty'), ('hunter_level')
+  values ('e1rm_centi'), ('pr_kind_allowed'), ('to_centi')
 ),
 
 -- ---------------------------------------------------------------------------
@@ -69,7 +70,8 @@ anon_can_execute as (
   where has_function_privilege('anon', oid, 'execute') and not is_trigger
 ),
 -- Table privileges that differ from the design: authenticated may SELECT every
--- table, INSERT and UPDATE only quests, DELETE nothing; anon may do nothing.
+-- table, INSERT and UPDATE only quests and exercises (custom rows, by policy),
+-- DELETE nothing; anon may do nothing.
 grant_violations as (
   select format('%s %s on %s', role_name, privilege, t.name) as violation
   from expected_tables t
@@ -80,14 +82,14 @@ grant_violations as (
       <> case
            when role_name = 'anon' then false
            when privilege = 'SELECT' then true
-           when privilege in ('INSERT', 'UPDATE') then t.name = 'quests'
+           when privilege in ('INSERT', 'UPDATE') then t.name in ('quests', 'exercises')
            else false
          end
 ),
 
 checks(ord, check_name, passed, detail) as (
   -- 1 -----------------------------------------------------------------------
-  select 1, 'All 14 tables exist',
+  select 1, 'All 16 tables exist',
     not exists (select 1 from expected_tables e where e.name not in (select name from public_tables)),
     coalesce(
       'missing: ' || (select string_agg(e.name, ', ') from expected_tables e
@@ -164,7 +166,7 @@ checks(ord, check_name, passed, detail) as (
     not exists (select 1 from grant_violations),
     coalesce(
       'differs: ' || (select string_agg(violation, ', ') from grant_violations),
-      'authenticated: SELECT all, INSERT/UPDATE quests only; anon: nothing')
+      'authenticated: SELECT all, INSERT/UPDATE quests and exercises only; anon: nothing')
 
   -- 8 -----------------------------------------------------------------------
   union all
@@ -209,7 +211,7 @@ checks(ord, check_name, passed, detail) as (
       'missing: ' || (select string_agg(name, ', ') from (
         select name from latest_migration_functions
         except select name from public_functions) l),
-      'Penalty Zone functions present (migration 20261124000200)')
+      'Gym functions present (migration 20261125000300)')
 
   -- 12 ----------------------------------------------------------------------
   union all
@@ -225,6 +227,17 @@ checks(ord, check_name, passed, detail) as (
       where state in ('pending_choice', 'trial_active', 'debt_active', 'weakened_active')
       group by user_id having count(*) > 1),
     format('%s penalties on record', (select count(*) from public.penalties))
+
+  -- 14 ----------------------------------------------------------------------
+  union all
+  select 14, 'Exercise library seeded, every set linked to an exercise',
+    exists (select 1 from public.exercises where user_id is null)
+    and not exists (select 1 from public.workout_sets where exercise_id is null),
+    format('%s library exercises, %s custom; %s of %s sets linked',
+      (select count(*) from public.exercises where user_id is null),
+      (select count(*) from public.exercises where user_id is not null),
+      (select count(exercise_id) from public.workout_sets),
+      (select count(*) from public.workout_sets))
 )
 
 select check_name, case when passed then 'PASS' else 'FAIL' end as status, detail

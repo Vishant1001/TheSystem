@@ -57,6 +57,55 @@ export type Database = {
         };
         Relationships: [];
       };
+      exercises: {
+        Row: {
+          archived_at: string | null;
+          category: string | null;
+          created_at: string;
+          equipment: string | null;
+          force: string | null;
+          id: string;
+          kind: string;
+          mechanic: string | null;
+          name: string;
+          primary_muscles: string[];
+          secondary_muscles: string[];
+          source_id: string | null;
+          user_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          archived_at?: string | null;
+          category?: string | null;
+          created_at?: string;
+          equipment?: string | null;
+          force?: string | null;
+          id?: string;
+          kind: string;
+          mechanic?: string | null;
+          name: string;
+          primary_muscles?: string[];
+          secondary_muscles?: string[];
+          source_id?: string | null;
+          user_id?: string | null;
+        };
+        Update: {
+          archived_at?: string | null;
+          category?: string | null;
+          created_at?: string;
+          equipment?: string | null;
+          force?: string | null;
+          id?: string;
+          kind?: string;
+          mechanic?: string | null;
+          name?: string;
+          primary_muscles?: string[];
+          secondary_muscles?: string[];
+          source_id?: string | null;
+          user_id?: string | null;
+        };
+        Relationships: [];
+      };
       food_entries: {
         Row: {
           created_at: string;
@@ -263,6 +312,81 @@ export type Database = {
             columns: ['trial_quest_id'];
             isOneToOne: false;
             referencedRelation: 'quests';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      personal_records: {
+        Row: {
+          baseline: boolean;
+          created_at: string;
+          exercise_id: string;
+          id: string;
+          occurred_on: string;
+          pr_kind: string;
+          reversed_at: string | null;
+          set_id: string | null;
+          user_id: string;
+          value_centi: number;
+          workout_id: string | null;
+          xp_event_id: string | null;
+        };
+        ComputedFields: never;
+        Insert: {
+          baseline: boolean;
+          created_at?: string;
+          exercise_id: string;
+          id?: string;
+          occurred_on: string;
+          pr_kind: string;
+          reversed_at?: string | null;
+          set_id?: string | null;
+          user_id: string;
+          value_centi: number;
+          workout_id?: string | null;
+          xp_event_id?: string | null;
+        };
+        Update: {
+          baseline?: boolean;
+          created_at?: string;
+          exercise_id?: string;
+          id?: string;
+          occurred_on?: string;
+          pr_kind?: string;
+          reversed_at?: string | null;
+          set_id?: string | null;
+          user_id?: string;
+          value_centi?: number;
+          workout_id?: string | null;
+          xp_event_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'personal_records_exercise_id_fkey';
+            columns: ['exercise_id'];
+            isOneToOne: false;
+            referencedRelation: 'exercises';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'personal_records_set_id_fkey';
+            columns: ['set_id'];
+            isOneToOne: false;
+            referencedRelation: 'workout_sets';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'personal_records_workout_id_fkey';
+            columns: ['workout_id'];
+            isOneToOne: false;
+            referencedRelation: 'workouts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'personal_records_xp_event_id_fkey';
+            columns: ['xp_event_id'];
+            isOneToOne: false;
+            referencedRelation: 'xp_events';
             referencedColumns: ['id'];
           },
         ];
@@ -481,34 +605,53 @@ export type Database = {
       };
       workout_sets: {
         Row: {
+          distance_m: number | null;
+          duration_s: number | null;
+          exercise_id: string | null;
           exercise_name: string;
           id: string;
-          reps: number;
+          reps: number | null;
           set_index: number;
+          set_type: string;
           user_id: string;
           weight_kg: number | null;
           workout_id: string;
         };
         ComputedFields: never;
         Insert: {
+          distance_m?: number | null;
+          duration_s?: number | null;
+          exercise_id?: string | null;
           exercise_name: string;
           id?: string;
-          reps: number;
+          reps?: number | null;
           set_index: number;
+          set_type?: string;
           user_id: string;
           weight_kg?: number | null;
           workout_id: string;
         };
         Update: {
+          distance_m?: number | null;
+          duration_s?: number | null;
+          exercise_id?: string | null;
           exercise_name?: string;
           id?: string;
-          reps?: number;
+          reps?: number | null;
           set_index?: number;
+          set_type?: string;
           user_id?: string;
           weight_kg?: number | null;
           workout_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: 'workout_sets_exercise_id_fkey';
+            columns: ['exercise_id'];
+            isOneToOne: false;
+            referencedRelation: 'exercises';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'workout_sets_workout_id_fkey';
             columns: ['workout_id'];
@@ -765,6 +908,7 @@ export type Database = {
       debt_repayment: { Args: { p_award_xp: number; p_debt_remaining: number }; Returns: number };
       delete_food: { Args: { p_id: string }; Returns: Json };
       delete_workout: { Args: { p_id: string }; Returns: Json };
+      e1rm_centi: { Args: { p_reps: number; p_weight_centi: number }; Returns: number };
       earns_stone: {
         Args: { p_held: number; p_mode: string; p_streak_after: number; p_streak_before: number };
         Returns: boolean;
@@ -874,6 +1018,7 @@ export type Database = {
         Returns: boolean;
       };
       pending_report: { Args: Record<PropertyKey, never>; Returns: Json };
+      pr_kind_allowed: { Args: { p_kind: string }; Returns: boolean };
       quest_on_board: {
         Args: {
           p_day: string;
@@ -940,6 +1085,7 @@ export type Database = {
       start_safe_period: { Args: { p_days: number; p_kind: string }; Returns: Json };
       start_trial: { Args: { p_penalty_id: string }; Returns: undefined };
       stones_held: { Args: { p_user: string }; Returns: number };
+      to_centi: { Args: { p_kg: number }; Returns: number };
       trial_category: { Args: { p_categories: string[] }; Returns: string };
       undo_completion: { Args: { p_completion_id: string }; Returns: Json };
       update_hunter_profile: {

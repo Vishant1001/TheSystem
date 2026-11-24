@@ -15,6 +15,10 @@ import levelCurveVectors from './testdata/level-curve-vectors.json';
 import debtVectors from './testdata/debt-vectors.json';
 import penaltyVectors from './testdata/penalty-vectors.json';
 import awardVectors from './testdata/award-vectors.json';
+import gymVectors from './testdata/gym-vectors.json';
+import exerciseLibrary from '../../supabase/data/exercise-library.json';
+import exerciseLibraryMigration from '../../supabase/migrations/20261125000200_exercise_library.sql?raw';
+import gymParityTest from '../../supabase/tests/gym_parity.sql?raw';
 
 /**
  * ADR-4 / C2 drift guard.
@@ -146,5 +150,49 @@ describe('generated penalty parity test (Step 2.3)', () => {
       36,
     );
     expect(count(/from public\.compute_award\(/g)).toBe(awardVectors.length);
+  });
+});
+
+describe('generated exercise library seed (Step 2.5)', () => {
+  // One VALUES row per line; a row may end in a quoted value or in null.
+  const rows = [...exerciseLibraryMigration.matchAll(/^ {2}\('.*\),?\r?$/gm)].map(
+    (match) => match[0],
+  );
+
+  it('is marked as generated and records its pinned source', () => {
+    expect(exerciseLibraryMigration).toContain('GENERATED FILE - DO NOT EDIT BY HAND');
+    expect(exerciseLibraryMigration).toContain(exerciseLibrary.source.commit);
+    expect(exerciseLibraryMigration).toContain('Unlicense');
+  });
+
+  it('seeds every exercise in the snapshot, once', () => {
+    expect(rows).toHaveLength(exerciseLibrary.exercises.length);
+  });
+
+  it('gives each exercise the kind the config maps its category to', () => {
+    const kinds: Record<string, string> = GAME_CONFIG.gym.libraryCategoryKinds;
+    for (const exercise of exerciseLibrary.exercises) {
+      const sqlId = `'${exercise.id.replaceAll("'", "''")}'`;
+      const sqlName = `'${exercise.name.replaceAll("'", "''")}'`;
+      const row = rows.find((candidate) => candidate.startsWith(`  (${sqlId}, `));
+      expect(row, exercise.id).toBeDefined();
+      expect(row).toContain(
+        `${sqlName}, '${exercise.category}', '${kinds[exercise.category] ?? '?'}'`,
+      );
+    }
+  });
+
+  it('upserts library rows by source id', () => {
+    expect(exerciseLibraryMigration).toContain(
+      'on conflict (source_id) where user_id is null do update',
+    );
+  });
+});
+
+describe('generated gym parity test (Step 2.5: e1RM)', () => {
+  it('asserts every e1RM vector', () => {
+    expect([...gymParityTest.matchAll(/public\.e1rm_centi\(/g)]).toHaveLength(
+      gymVectors.e1rm.length,
+    );
   });
 });

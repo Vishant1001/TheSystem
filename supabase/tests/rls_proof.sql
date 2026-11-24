@@ -61,6 +61,13 @@ values ('11111111-1111-1111-1111-111111111111', current_date - 1, 'standard', 'p
 select public.start_trial(id) from public.penalties
 where user_id = '11111111-1111-1111-1111-111111111111';
 
+-- A custom exercise and a record for B (records only come from logging).
+insert into public.exercises (user_id, name, kind)
+values ('22222222-2222-2222-2222-222222222222', 'B secret lift', 'strength');
+insert into public.personal_records (user_id, exercise_id, pr_kind, value_centi, occurred_on, baseline)
+select '22222222-2222-2222-2222-222222222222', id, 'max_weight', 10000, current_date, true
+from public.exercises where name = 'B secret lift';
+
 -- ---------------------------------------------------------------------------
 -- Act as A and try to see or touch B.
 -- ---------------------------------------------------------------------------
@@ -117,6 +124,12 @@ begin
   select count(*) into v_count from public.penalties where user_id = v_user_b;
   if v_count <> 0 then v_leaks := v_leaks || 'penalties '; end if;
 
+  select count(*) into v_count from public.exercises where user_id = v_user_b;
+  if v_count <> 0 then v_leaks := v_leaks || 'exercises '; end if;
+
+  select count(*) into v_count from public.personal_records where user_id = v_user_b;
+  if v_count <> 0 then v_leaks := v_leaks || 'personal_records '; end if;
+
   if v_leaks <> '' then
     raise exception 'RLS LEAK: hunter A can read hunter B rows in: %', v_leaks;
   end if;
@@ -138,6 +151,16 @@ begin
   select count(*) into v_count from public.quests;
   if v_count <> 5 then
     raise exception 'RLS LEAK: unfiltered select on quests returned % rows (expected A''s 4 + 1 trial)', v_count;
+  end if;
+
+  -- ...except the shared exercise library, which every hunter reads.
+  select count(*) into v_count from public.exercises where user_id is null;
+  if v_count = 0 then
+    raise exception 'the exercise library must be readable by a signed-in hunter';
+  end if;
+  select count(*) into v_count from public.exercises where user_id is not null;
+  if v_count <> 0 then
+    raise exception 'RLS LEAK: A sees % custom exercises that are not A''s', v_count;
   end if;
 
   raise notice 'unfiltered selects return only the caller rows';
@@ -233,7 +256,13 @@ begin
     'update public.penalties set state = ''redeemed''',
     'delete from public.penalties',
     'update public.xp_events set related_event_id = null',
-    'delete from public.quests'
+    'delete from public.quests',
+    'insert into public.exercises (user_id, source_id, name, kind) values (null, ''Fake_Lift'', ''Fake lift'', ''strength'')',
+    format('insert into public.exercises (user_id, name, kind) values (%L, ''Planted'', ''strength'')', v_user_b),
+    'delete from public.exercises',
+    format('insert into public.personal_records (user_id, exercise_id, pr_kind, value_centi, occurred_on, baseline) select %L, id, ''e1rm'', 99999, current_date, false from public.exercises limit 1', v_user_a),
+    'update public.personal_records set value_centi = 1',
+    'delete from public.personal_records'
   ]
   loop
     v_blocked := false;
@@ -276,6 +305,29 @@ begin
   update public.quests set title = 'Study hard' where user_id = v_user_a and title = 'Study';
   if not found then
     raise exception 'a client could not edit its own quest';
+  end if;
+
+  -- 4d. The library is read-only: an update reaches no row at all.
+  update public.exercises set name = 'Renamed by A' where user_id is null;
+  if found then
+    raise exception 'SECURITY FAILURE: a client renamed a library exercise';
+  end if;
+
+  -- A may create, rename and archive its own custom exercise - but never
+  -- change what kind of exercise it is.
+  insert into public.exercises (user_id, name, kind) values (v_user_a, 'A custom lift', 'cardio');
+  update public.exercises set name = 'A renamed lift' where user_id = v_user_a;
+  if not found then
+    raise exception 'a client could not rename its own custom exercise';
+  end if;
+  v_blocked := false;
+  begin
+    update public.exercises set kind = 'strength' where user_id = v_user_a;
+  exception when others then
+    v_blocked := sqlerrm like 'EXERCISE_IMMUTABLE%';
+  end;
+  if not v_blocked then
+    raise exception 'SECURITY FAILURE: a client changed the kind of an exercise';
   end if;
 
   -- 5. A cannot complete one of B's quests, even knowing its id.
@@ -392,7 +444,10 @@ begin
     'select public.penalty_json(null::public.penalties)',
     'select public.penalty_options(null::public.penalties)',
     'select public.clear_trial(''22222222-2222-2222-2222-222222222222''::uuid, null::public.quests, null)',
-    'select public.evaluate_food_trial(''22222222-2222-2222-2222-222222222222''::uuid)'
+    'select public.evaluate_food_trial(''22222222-2222-2222-2222-222222222222''::uuid)',
+    'select public.to_centi(1.5)',
+    'select public.e1rm_centi(10000, 5)',
+    'select public.pr_kind_allowed(''strength'')'
   ]
   loop
     v_blocked := false;
@@ -529,7 +584,9 @@ declare
     'choose_penalty', 'acknowledge_penalty', 'redeem_penalty'
   ];
   -- A trigger function cannot be called directly, whatever its grant says.
-  v_trigger_functions text[] := array['quests_guard_immutable', 'penalties_guard_transition'];
+  v_trigger_functions text[] := array[
+    'quests_guard_immutable', 'penalties_guard_transition', 'exercises_guard_immutable'
+  ];
   v_extra text;
   v_missing text;
   v_anon text;
