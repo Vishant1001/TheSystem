@@ -17,6 +17,9 @@ import { kcalStatus, sumFood, useFood } from '../../lib/queries/logs';
 import type { QuestView } from '../../lib/queries/quests';
 import { systemMessage } from '../../lib/systemError';
 import { useNow } from '../../lib/useNow';
+import { BossesSection } from '../gym/BossesSection';
+import { useWorkoutDraft } from '../gym/draftStore';
+import { unfinishedWorkoutNote } from '../gym/gymText';
 import { PenaltyWarning } from '../penalty/PenaltyWarning';
 import { QuestCard } from './QuestCard';
 import { useTodayBoard } from './useTodayBoard';
@@ -38,6 +41,7 @@ export function QuestsScreen() {
   const day = data?.game_today;
 
   const today = useTodayBoard(data);
+  const draft = useWorkoutDraft();
   const food = useFood(day);
   const toast = useToast();
 
@@ -103,6 +107,17 @@ export function QuestsScreen() {
     }
 
     return undefined;
+  }
+
+  // 2.7 review: an unfinished workout draft is not a completed Train quest.
+  function liveStatusWithDraft(view: QuestView): ReturnType<typeof liveStatusFor> {
+    const note = unfinishedWorkoutNote({
+      tracking: view.quest.tracking,
+      trainCompleted: view.completion !== null,
+      hasDraft: draft !== null,
+      note: systemCopy.gym.unfinishedTrain,
+    });
+    return note === null ? liveStatusFor(view.quest.tracking) : { text: note, tone: 'penalty' };
   }
 
   function handleComplete(view: QuestView, value: number | null) {
@@ -171,7 +186,11 @@ export function QuestsScreen() {
 
   return (
     <>
-      <PenaltyWarning snapshot={data} coreRemaining={today.coreRemaining} />
+      <PenaltyWarning
+        snapshot={data}
+        coreRemaining={today.coreRemaining}
+        trainOpen={today.trainOpen}
+      />
 
       {activeTrial !== undefined && openTrial !== null && (
         <SystemWindow
@@ -195,7 +214,7 @@ export function QuestsScreen() {
           <EmptyState message={systemCopy.empty.quests} />
         ) : (
           <ul className="flex flex-col divide-y divide-system/10">
-            {board.daily.map((view) => card(view, liveStatusFor(view.quest.tracking)))}
+            {board.daily.map((view) => card(view, liveStatusWithDraft(view)))}
           </ul>
         )}
       </SystemWindow>
@@ -214,6 +233,8 @@ export function QuestsScreen() {
         <PlusIcon className="size-4" />
         {systemCopy.actions.addQuest}
       </SystemLink>
+
+      <BossesSection />
     </>
   );
 }

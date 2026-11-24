@@ -70,6 +70,11 @@ const gameConfigSchema = z.object({
     /** Most game days close_days() will process in a single call (G8). */
     maxBackfillDays: positiveInt,
   }),
+  /** Workout logger (client only; not part of the SQL slice). */
+  logger: z.object({
+    /** An unfinished workout warns this many minutes before the rollover. */
+    finishWarningMinutes: positiveInt,
+  }),
   levels: z.object({
     base: nonNegativeInt,
     coefficient: z.number().positive(),

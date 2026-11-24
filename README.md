@@ -63,11 +63,64 @@ Open http://localhost:5173 and sign up — the local stack does not send confirm
 **Every day after that:** start Docker Desktop, then `npx supabase start` and
 `npm run dev`. Stop the stack with `npx supabase stop`.
 
+### 1.1 Test the dev build on your phone (home WiFi)
+
+The phone opens the dev server by your PC's address on the home network. It only ever
+talks to the dev server: in development, a page opened from another device sends its
+Supabase calls to the dev server's own `/supabase` path, which forwards them to the local
+stack (`vite.config.ts`, `src/lib/supabaseUrl.ts`). Nothing about your network is written to
+any file, and production builds are unaffected.
+
+1. The PC and the phone must be on the same WiFi/router. With the stack running
+   (`npx supabase start`), start the dev server for the network:
+
+   ```powershell
+   npm run dev:lan
+   ```
+
+   Vite prints a `Network:` line per network adapter. Use the one marked `Ethernet` or
+   `Wi-Fi` (an address like `http://192.168.x.y:5173`), not the `vEthernet`/WSL ones.
+
+2. **Windows Firewall.** The first time Node.js listens on the network, Windows may show
+   _"Windows Defender Firewall has blocked some features of Node.js JavaScript Runtime"_.
+   Tick **Private networks**, click **Allow access**. If no prompt appears, Node is already
+   allowed (check _Windows Security → Firewall & network protection → Allow an app through
+   firewall → Node.js JavaScript Runtime_).
+
+3. **Network profile.** If your home connection is marked _Public_, Windows blocks incoming
+   connections for any app not explicitly allowed on Public. Set your home network to
+   **Private**: _Settings → Network & internet → Ethernet_ (or _Wi-Fi → your network_) →
+   _Network profile type_ → **Private network**. Only do this for your own home network.
+
+4. On the phone, open the `Network:` address in the browser and sign in with your local
+   account. The phone uses plain `http`, so it is a browser tab, not an installable PWA, and
+   the Vibration API may be unavailable; everything else works as on the PC.
+
+5. When you are done, stop the dev server (`Ctrl+C`) and the stack (`npx supabase stop`).
+   While `supabase start` runs, Docker also publishes the local database and Studio ports on
+   your network (default local passwords), so do not leave it running on networks you do not
+   trust.
+
+**Local walkthrough data.** `npx supabase db reset` wipes local accounts. After one, sign up
+again, then:
+
+```powershell
+npm run sim:days -- --set 'sim.lived={4,3,2,1}' --set 'sim.food_only={}'
+```
+
+```powershell
+npm run db:sql -- supabase/dev/seed_gym_history.sql
+```
+
+The first gives you four cleared days (no penalty waiting); the second adds Phase 1-style
+gym history, including a custom "Squat" to try **Merge into…** on.
+
 ## 2. Scripts
 
 | Script                | What it does                                                  |
 | --------------------- | ------------------------------------------------------------- |
 | `npm run dev`         | Vite dev server on http://localhost:5173                      |
+| `npm run dev:lan`     | The same, reachable from your phone on home WiFi (see 1.1)    |
 | `npm run build`       | Type-check both TS projects, then build to `dist/`            |
 | `npm run preview`     | Serve the built app with its service worker on port 4173      |
 | `npm run typecheck`   | `tsc` over `src/` and over the build config files             |

@@ -305,6 +305,7 @@ export type Database = {
           kcal_min: number;
           last_closed_on: string | null;
           protein_target_g: number;
+          rest_timer_s: number | null;
           rules_from: string;
           timezone: string;
           user_id: string;
@@ -318,6 +319,7 @@ export type Database = {
           kcal_min: number;
           last_closed_on?: string | null;
           protein_target_g: number;
+          rest_timer_s?: number | null;
           rules_from: string;
           timezone?: string;
           user_id: string;
@@ -330,6 +332,7 @@ export type Database = {
           kcal_min?: number;
           last_closed_on?: string | null;
           protein_target_g?: number;
+          rest_timer_s?: number | null;
           rules_from?: string;
           timezone?: string;
           user_id?: string;
@@ -1119,6 +1122,7 @@ export type Database = {
           isSetofReturn: false;
         };
       };
+      exercise_summaries: { Args: Record<PropertyKey, never>; Returns: Json };
       expire_trials: { Args: { p_user: string }; Returns: number };
       failed_day_action: {
         Args: { p_mode: string; p_open_escalated: boolean; p_open_state: string };
@@ -1304,6 +1308,7 @@ export type Database = {
         Returns: string;
       };
       safe_start_for: { Args: { p_user: string }; Returns: string };
+      set_rest_timer: { Args: { p_seconds: number }; Returns: Json };
       split_by_weight: {
         Args: { p_minimum?: number; p_stats: Json; p_total: number };
         Returns: Json;

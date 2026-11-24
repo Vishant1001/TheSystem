@@ -55,7 +55,11 @@ export function StatusScreen() {
 
   return (
     <>
-      <PenaltyWarning snapshot={data} coreRemaining={today.coreRemaining} />
+      <PenaltyWarning
+        snapshot={data}
+        coreRemaining={today.coreRemaining}
+        trainOpen={today.trainOpen}
+      />
       {penaltyOpen && <ActivePenalty snapshot={data} />}
 
       <SystemWindow

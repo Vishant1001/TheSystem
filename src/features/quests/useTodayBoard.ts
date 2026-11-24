@@ -13,6 +13,8 @@ export interface TodayBoard {
   board: QuestBoard | null;
   /** Core quests still open today, by the close_days tally rule (3.2, 3.7). */
   coreRemaining: number;
+  /** The Train quest (auto_workout) is on today's board and not yet complete. */
+  trainOpen: boolean;
   isPending: boolean;
   error: Error | null;
   refetch: () => void;
@@ -43,9 +45,15 @@ export function useTodayBoard(snapshot: HunterSnapshot | null | undefined): Toda
   const coreRemaining =
     board === null || day === undefined ? 0 : coreRemainingToday(board, day, timezone, restDay);
 
+  const trainOpen =
+    board?.daily.some(
+      (view) => view.quest.tracking === 'auto_workout' && view.completion === null,
+    ) ?? false;
+
   return {
     board,
     coreRemaining,
+    trainOpen,
     isPending: quests.isPending || completions.isPending,
     error: quests.error ?? completions.error ?? oneTimeCompletions.error,
     refetch: () => {

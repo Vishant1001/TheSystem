@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { SystemErrorPanel, SystemLoading } from '../../components/SystemStates';
 import { SystemWindow } from '../../components/SystemWindow';
 import { systemCopy } from '../../copy/system';
 import { useHunterSnapshot } from '../../lib/queries/hunterSnapshot';
 import { systemMessage } from '../../lib/systemError';
+import { useAuth } from '../auth/authContext';
+import { readDraft } from '../gym/draftStore';
 import { FoodTab } from './FoodTab';
 import { WorkoutTab } from './WorkoutTab';
 
@@ -15,7 +18,15 @@ const tabs: { id: LogTab; label: string }[] = [
 ];
 
 export function LogScreen() {
-  const [activeTab, setActiveTab] = useState<LogTab>('food');
+  // The logger returns here with ?tab=workout; a workout in progress also
+  // opens on the Workout tab, so Resume is one tap away.
+  const [params] = useSearchParams();
+  const { session } = useAuth();
+  const [activeTab, setActiveTab] = useState<LogTab>(() =>
+    params.get('tab') === 'workout' || (session !== null && readDraft(session.user.id) !== null)
+      ? 'workout'
+      : 'food',
+  );
   const { data, isPending, isError, error, refetch } = useHunterSnapshot();
 
   if (isPending) return <SystemLoading />;

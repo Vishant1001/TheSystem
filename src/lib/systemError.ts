@@ -20,6 +20,7 @@ export function systemMessage(
   if (mapped !== undefined) return mapped;
 
   const lower = raw.toLowerCase();
+  if (lower.includes('exercises_custom_name_uidx')) return systemCopy.errors.duplicateExercise;
   if (lower.includes('invalid login credentials')) return systemCopy.authErrors.invalidCredentials;
   if (lower.includes('already registered') || lower.includes('already been registered')) {
     return systemCopy.authErrors.userExists;

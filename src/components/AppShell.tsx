@@ -1,5 +1,7 @@
 import { Outlet, useLocation } from 'react-router';
 import { systemCopy } from '../copy/system';
+import { RestTimerBar } from '../features/gym/RestTimerBar';
+import { useRestTimer } from '../features/gym/restTimerStore';
 import { LevelUpWatcher } from '../features/status/LevelUpModal';
 import { useDayClose } from '../features/report/useDayClose';
 import { BottomNav } from './BottomNav';
@@ -15,9 +17,13 @@ export function AppShell() {
   const settling = dayClose === 'idle' || dayClose === 'closing';
   // The gates offer no navigation besides Retry and Sign out (brief 3.5).
   const onGate = pathname === '/report' || pathname === '/penalty';
+  // Brief 4.6: the rest timer survives navigation, so it lives in the shell.
+  const timerShowing = useRestTimer() !== null && !onGate;
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pt-safe pb-28">
+    <div
+      className={`mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 pt-safe ${timerShowing ? 'pb-44' : 'pb-28'}`}
+    >
       <header className="mb-4 flex items-baseline justify-between">
         <span className="font-display text-base font-bold tracking-[0.34em] text-system-glow uppercase text-glow">
           {systemCopy.app.name}
@@ -35,6 +41,7 @@ export function AppShell() {
         )}
       </main>
       <LevelUpWatcher />
+      {timerShowing && <RestTimerBar />}
       {!onGate && <BottomNav />}
     </div>
   );

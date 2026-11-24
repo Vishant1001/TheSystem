@@ -12,6 +12,7 @@ import { hunterSnapshotKey, useHunterSnapshot } from '../../lib/queries/hunterSn
 import { hunterSnapshotSchema, type HunterProfileInput } from '../../lib/schemas';
 import { supabase } from '../../lib/supabase';
 import { systemMessage } from '../../lib/systemError';
+import { RestTimerSetting } from './RestTimerSetting';
 
 /**
  * Hunter Settings (C4). Name and timezone apply immediately; the diet targets
@@ -121,6 +122,8 @@ export function SettingsScreen() {
           <p className="pt-3 text-xs text-system-glow">{systemCopy.settings.pendingChange}</p>
         )}
       </SystemWindow>
+
+      <RestTimerSetting />
 
       <SystemLink to="/settings/safe-zones" className="w-full">
         {systemCopy.safeZones.open}

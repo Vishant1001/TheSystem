@@ -401,6 +401,15 @@ begin
     raise exception 'SECURITY FAILURE: hunter A could redeem a penalty owned by B';
   end if;
 
+  -- 5e. exercise_summaries() lists only A's own sets.
+  if exists (
+    select 1 from jsonb_array_elements(public.exercise_summaries()) e
+    where (e ->> 'exercise_id')::uuid in (
+      select exercise_id from public.workout_sets where user_id = v_user_b)
+  ) then
+    raise exception 'RLS LEAK: exercise_summaries() returned hunter B''s history';
+  end if;
+
   -- 5d. Nor edit or retire B's boss, nor merge or log B's custom exercise.
   execute 'reset role';
   select id into v_quest_b from public.bosses where user_id = v_user_b limit 1;
@@ -626,7 +635,9 @@ begin
     'select public.create_boss(gen_random_uuid(), 1, 1, ''E'')',
     'select public.update_boss(gen_random_uuid(), 1, 1, ''E'')',
     'select public.archive_boss(gen_random_uuid())',
-    'select public.merge_exercise(gen_random_uuid(), gen_random_uuid())'
+    'select public.merge_exercise(gen_random_uuid(), gen_random_uuid())',
+    'select public.set_rest_timer(90)',
+    'select public.exercise_summaries()'
   ]
   loop
     v_blocked := false;
@@ -659,7 +670,8 @@ declare
     'log_food', 'log_workout', 'onboard_hunter', 'pending_report', 'start_safe_period',
     'undo_completion', 'update_hunter_profile', 'update_hunter_rules',
     'choose_penalty', 'acknowledge_penalty', 'redeem_penalty',
-    'create_boss', 'update_boss', 'archive_boss', 'merge_exercise'
+    'create_boss', 'update_boss', 'archive_boss', 'merge_exercise',
+    'set_rest_timer', 'exercise_summaries'
   ];
   -- A trigger function cannot be called directly, whatever its grant says.
   v_trigger_functions text[] := array[

@@ -6,6 +6,9 @@
   "dayClose": {
     "maxBackfillDays": 30
   },
+  "logger": {
+    "finishWarningMinutes": 30
+  },
   "levels": {
     "base": 50,
     "coefficient": 6,

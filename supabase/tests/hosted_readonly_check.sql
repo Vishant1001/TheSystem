@@ -21,7 +21,7 @@ expected_tables(name) as (
     ('safe_periods'), ('redemption_stone_events'), ('penalties'),
     ('exercises'), ('personal_records'), ('bosses')
 ),
--- The client surface: exactly these 24 RPCs. Trigger functions are left out
+-- The client surface: exactly these 26 RPCs. Trigger functions are left out
 -- of the comparison: they can never be called directly.
 expected_client_functions(name) as (
   values
@@ -31,7 +31,8 @@ expected_client_functions(name) as (
     ('undo_completion'), ('update_hunter_profile'),
     ('start_safe_period'), ('end_safe_period'), ('update_hunter_rules'),
     ('choose_penalty'), ('acknowledge_penalty'), ('redeem_penalty'),
-    ('create_boss'), ('update_boss'), ('archive_boss'), ('merge_exercise')
+    ('create_boss'), ('update_boss'), ('archive_boss'), ('merge_exercise'),
+    ('set_rest_timer'), ('exercise_summaries')
 ),
 expected_config_keys(key) as (
   values
@@ -43,7 +44,7 @@ expected_config_keys(key) as (
 -- Objects created by the last migration; their presence means every migration
 -- before it ran too.
 latest_migration_functions(name) as (
-  values ('award_workout'), ('detect_prs'), ('merge_exercise'), ('reverse_workout_awards')
+  values ('set_rest_timer'), ('exercise_summaries')
 ),
 
 -- ---------------------------------------------------------------------------
@@ -139,7 +140,7 @@ checks(ord, check_name, passed, detail) as (
 
   -- 5 -----------------------------------------------------------------------
   union all
-  select 5, 'authenticated can EXECUTE exactly the 24 RPCs',
+  select 5, 'authenticated can EXECUTE exactly the 26 RPCs',
     not exists (select name from expected_client_functions
                 except select name from authenticated_can_execute)
     and not exists (select name from authenticated_can_execute
@@ -212,7 +213,7 @@ checks(ord, check_name, passed, detail) as (
       'missing: ' || (select string_agg(name, ', ') from (
         select name from latest_migration_functions
         except select name from public_functions) l),
-      'Gym reward functions present (migration 20261126000200)')
+      'Logger support functions present (migration 20261127000100)')
 
   -- 12 ----------------------------------------------------------------------
   union all

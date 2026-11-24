@@ -37,10 +37,40 @@ function assertHostedSupabaseOnVercel(mode: string): void {
   }
 }
 
+/**
+ * Dev server only: `/supabase/*` is forwarded to the Supabase URL in
+ * .env.local when that URL is the local stack. A phone on home WiFi opens the
+ * dev server by the PC's LAN address; talking to the API through the same
+ * origin avoids cross-origin and local-network blocks in mobile browsers, and
+ * the phone never needs the stack's own ports (see src/lib/supabaseUrl.ts).
+ */
+export const SUPABASE_DEV_PROXY_PATH = '/supabase';
+
+function localSupabaseProxy(mode: string) {
+  const env = loadEnv(mode, process.cwd(), 'VITE_');
+  let target: URL;
+  try {
+    target = new URL(env.VITE_SUPABASE_URL ?? '');
+  } catch {
+    return undefined;
+  }
+  if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname)) return undefined;
+  return {
+    [SUPABASE_DEV_PROXY_PATH]: {
+      target: target.origin,
+      changeOrigin: true,
+      rewrite: (path: string) => path.slice(SUPABASE_DEV_PROXY_PATH.length),
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   assertHostedSupabaseOnVercel(mode);
 
   return {
+    server: {
+      proxy: localSupabaseProxy(mode),
+    },
     plugins: [
       react(),
       tailwindcss(),

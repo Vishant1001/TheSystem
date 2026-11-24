@@ -27,6 +27,7 @@ any database — applying is your call.
 | `20261125000300_gym_legacy_backfill.sql`      | e1RM in SQL; Phase 1 sets linked to exercises; PR baselines, no XP                 |
 | `20261126000100_gym_rewards_schema.sql`       | `bosses`, `workouts.counted_sets`, `exercises.merged_into_id`                      |
 | `20261126000200_gym_rewards_functions.sql`    | Set XP, PR detection and bonuses, bosses, reversal on delete, `merge_exercise`     |
+| `20261127000100_logger_support.sql`           | `hunters.rest_timer_s`, `set_rest_timer`, `exercise_summaries`                     |
 
 Never edit a generated config migration by hand. Change
 `src/game/game-config.json`, then run `npm run gen:sql`. The newest config
@@ -122,7 +123,8 @@ a single file with `npm run db:sql -- supabase/tests/rls_proof.sql`.
   the diet trial and the source x modifier matrix. Prints `PENALTY ZONE PASSED`.
 - `smoke_gym.sql` — set XP and the shared daily 20, the fitness cap, baselines,
   the 3rd PR of a day, bosses and their reversal, debt repayment on workout
-  and PR awards, the exercise merge, the Phase 1 payload. Prints `GYM PASSED`.
+  and PR awards, the exercise merge, the Phase 1 payload, the rest timer
+  setting and exercise summaries. Prints `GYM PASSED`.
 
 The test scripts run inside a transaction and end with `ROLLBACK`. They create
 throwaway `auth.users` rows, so run them against a local or test database.
@@ -180,6 +182,8 @@ short stable tokens — the client maps them to System copy, never shows them ra
 | `update_boss(id, target_weight_kg, target_reps, difficulty, name)`            | Edits an undefeated boss.                                                                                                                                                                                                                                                                                                                                   | `BOSS_NOT_FOUND`, `BOSS_DEFEATED`, `INVALID_BOSS`                                                                                                                                 |
 | `archive_boss(id)`                                                            | Retires an undefeated boss. A defeated boss is a trophy and stays.                                                                                                                                                                                                                                                                                          | `BOSS_NOT_FOUND`, `BOSS_DEFEATED`                                                                                                                                                 |
 | `merge_exercise(from_custom_id, into_exercise_id)`                            | Merges an own custom exercise into a library or own exercise of the same kind. See below.                                                                                                                                                                                                                                                                   | `EXERCISE_NOT_FOUND`, `EXERCISE_ARCHIVED`, `MERGE_INTO_SELF`, `MERGE_KIND_MISMATCH`                                                                                               |
+| `set_rest_timer(seconds)`                                                     | The rest timer default, within the config bounds. Applies at once.                                                                                                                                                                                                                                                                                          | `INVALID_REST_TIMER`, `HUNTER_NOT_FOUND`                                                                                                                                          |
+| `exercise_summaries()`                                                        | `[{exercise_id, set_count, last_on}]` for the caller: the picker ranks exercises with history first, the merge confirmation counts sets.                                                                                                                                                                                                                    | —                                                                                                                                                                                 |
 | `allocate_points(stat, points)`                                               | Appends a permanent allocation. Availability is checked client-side by the engine (ADR-5).                                                                                                                                                                                                                                                                  | `UNKNOWN_STAT_TAG`, `POINTS_MUST_BE_POSITIVE`, `HUNTER_NOT_FOUND`                                                                                                                 |
 | `close_days()`                                                                | Closes every unclosed game day before today: settles the deferred calorie quest, tallies core quests, writes `daily_logs`, awards the daily clear, advances `last_closed_on`. Idempotent, locks the hunter row, closes at most 30 days per call and reports `more_pending` (G8).                                                                            | `HUNTER_NOT_FOUND`                                                                                                                                                                |
 | `acknowledge_report()`                                                        | Marks every unacknowledged closed day as seen (G9).                                                                                                                                                                                                                                                                                                         | —                                                                                                                                                                                 |
@@ -321,6 +325,15 @@ and advancing `last_closed_on`. Phase 2 inserts the penalty step there; nothing
 above or below it needs rewriting (brief 6.4 step 5).
 
 ## Simulating days (dev only)
+
+For the logger walkthrough, run `dev/seed_gym_history.sql` after
+`sim:days` (below): it adds Phase 1-style gym history on the three days
+before today (a custom "Squat" ready to merge, and library bench press), with
+baselines and no XP. Same local-only guard:
+
+```powershell
+npm run db:sql -- supabase/dev/seed_gym_history.sql
+```
 
 `dev/simulate_days.sql` winds a hunter back so `close_days()` has real days to
 settle and the System Report has something to say.

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { hunterSnapshotKey } from '../queries/hunterSnapshot';
+import { gymKey } from '../queries/gym';
 import { foodKey, workoutsKey } from '../queries/logs';
 import { completionsKey, oneTimeCompletionsKey, questsKey } from '../queries/quests';
 import { supabase } from '../supabase';
@@ -35,13 +36,59 @@ export function trialAwardFrom(trial: unknown) {
   return parsed.success ? parsed.data : null;
 }
 
-/** delete_workout reports no set_count, so it is optional for both paths. */
+const statXpSchema = z.object({
+  STR: z.coerce.number(),
+  AGI: z.coerce.number(),
+  VIT: z.coerce.number(),
+  INT: z.coerce.number(),
+  SENSE: z.coerce.number(),
+});
+
+/** One apply_award result (Step 2.3 pipeline) as the gym replies carry it. */
+export const gymAwardSchema = z.object({
+  event_id: z.string(),
+  xp: z.coerce.number(),
+  full_xp: z.coerce.number(),
+  capped: z.boolean(),
+  stat_xp: statXpSchema,
+  weakened: z.boolean().default(false),
+  free_points: z.coerce.number().default(0),
+  debt_repayment: z.coerce.number().default(0),
+});
+
+export const prRecordSchema = z.object({
+  record_id: z.string(),
+  exercise_id: z.string(),
+  exercise_name: z.string(),
+  pr_kind: z.enum(['e1rm', 'max_weight']),
+  value_centi: z.coerce.number(),
+  baseline: z.boolean(),
+  set_id: z.string(),
+  bonus_event_id: z.string().nullable(),
+});
+
+/**
+ * delete_workout reports no set_count, so it is optional for both paths. The
+ * gym fields (Step 2.6) are log_workout only.
+ */
 export const workoutMutationSchema = z.object({
   workout_id: z.string(),
   occurred_on: z.string(),
   set_count: z.coerce.number().optional(),
   auto_workout: autoOutcomeSchema,
+  counted_sets: z.coerce.number().optional(),
+  workout_award: gymAwardSchema.nullable().optional(),
+  records: z.array(prRecordSchema).default([]),
+  pr_bonuses: z
+    .array(gymAwardSchema.extend({ set_id: z.string(), exercise_name: z.string() }))
+    .default([]),
+  bosses_defeated: z
+    .array(gymAwardSchema.extend({ boss_id: z.string(), boss_name: z.string() }))
+    .default([]),
 });
+
+export type WorkoutMutationResult = z.infer<typeof workoutMutationSchema>;
+export type GymAward = z.infer<typeof gymAwardSchema>;
 
 /** The award behind a 'completed' outcome, or null for anything else. */
 export function awardFromOutcome(outcome: AutoOutcome) {
@@ -52,12 +99,18 @@ export function awardFromOutcome(outcome: AutoOutcome) {
 
 export type AutoOutcome = z.infer<typeof autoOutcomeSchema>;
 
-/** The index signature keeps this assignable to the generated Json type. */
+/**
+ * One set of the log_workout payload (Step 2.6 shape). The index signature
+ * keeps it assignable to the generated Json type.
+ */
 export interface WorkoutSetInput {
   [key: string]: string | number | null;
-  exercise_name: string;
-  reps: number;
+  exercise_id: string;
+  set_type: 'warmup' | 'working';
+  reps: number | null;
   weight_kg: number | null;
+  duration_s: number | null;
+  distance_m: number | null;
 }
 
 function useLogInvalidation(day: string | undefined) {
@@ -74,6 +127,8 @@ function useLogInvalidation(day: string | undefined) {
             queryClient.invalidateQueries({ queryKey: workoutsKey(day) }),
             queryClient.invalidateQueries({ queryKey: completionsKey(day) }),
           ]),
+      // Workouts move history, records, bosses and the picker's ordering.
+      queryClient.invalidateQueries({ queryKey: gymKey }),
     ]);
   };
 }

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatCountdown, penaltyCountdown, shouldShowPenaltyWarning } from './countdown';
+import { GAME_CONFIG } from './config';
+import {
+  draftFinishNotice,
+  formatCountdown,
+  penaltyCountdown,
+  shouldShowPenaltyWarning,
+} from './countdown';
 import { addDays, daysBetween, wallTimeToInstant } from './dates';
 
 const BERLIN = 'Europe/Berlin';
@@ -162,5 +168,50 @@ describe('the warning window never crosses into the next day', () => {
       const length = countdown.dayEndsAt.getTime() - countdown.warningStartsAt.getTime();
       expect([3 * HOUR, 4 * HOUR, 5 * HOUR]).toContain(length);
     }
+  });
+});
+
+describe('draftFinishNotice (2.7 review: unfinished workouts)', () => {
+  const warn = GAME_CONFIG.logger.finishWarningMinutes;
+
+  it('warns only inside the last configured minutes before the 03:00 rollover', () => {
+    // Game day 2026-11-24 ends 2026-11-25 03:00 Berlin (CET) = 02:00Z.
+    const end = at('2026-11-25T02:00:00Z').getTime();
+    const before = new Date(end - warn * 60_000 - 1000);
+    const from = new Date(end - warn * 60_000);
+    const last = new Date(end - 1000);
+    const start = at('2026-11-24T20:00:00Z');
+    expect(draftFinishNotice(before, start, BERLIN).finishSoon).toBe(false);
+    expect(draftFinishNotice(from, start, BERLIN).finishSoon).toBe(true);
+    expect(draftFinishNotice(last, start, BERLIN)).toEqual({
+      gameDate: '2026-11-24',
+      startedOnEarlierDay: false,
+      finishSoon: true,
+    });
+    // At the rollover the day has changed and the warning is over.
+    expect(draftFinishNotice(new Date(end), start, BERLIN).finishSoon).toBe(false);
+  });
+
+  it('says a draft from an earlier game day counts for today', () => {
+    const startedLate = at('2026-11-25T01:50:00Z'); // 02:50 Berlin, still the 24th
+    expect(draftFinishNotice(at('2026-11-25T02:10:00Z'), startedLate, BERLIN)).toEqual({
+      gameDate: '2026-11-25',
+      startedOnEarlierDay: true,
+      finishSoon: false,
+    });
+    // Before 03:00 the same draft is still today's.
+    expect(
+      draftFinishNotice(at('2026-11-25T01:55:00Z'), startedLate, BERLIN).startedOnEarlierDay,
+    ).toBe(false);
+  });
+
+  it('measures real minutes across the spring-forward night', () => {
+    // 2026-03-29: clocks jump 02:00 -> 03:00 Berlin; day 2026-03-28 ends at 01:00Z.
+    const end = at('2026-03-29T01:00:00Z').getTime();
+    const start = at('2026-03-28T18:00:00Z');
+    expect(draftFinishNotice(new Date(end - warn * 60_000 - 1000), start, BERLIN).finishSoon).toBe(
+      false,
+    );
+    expect(draftFinishNotice(new Date(end - warn * 60_000), start, BERLIN).finishSoon).toBe(true);
   });
 });

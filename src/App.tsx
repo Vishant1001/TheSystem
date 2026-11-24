@@ -10,6 +10,9 @@ import {
   RequireSession,
 } from './components/guards';
 import { AuthScreen } from './features/auth/AuthScreen';
+import { BossFormScreen } from './features/gym/BossFormScreen';
+import { ExerciseHistoryScreen } from './features/gym/ExerciseHistoryScreen';
+import { WorkoutLoggerScreen } from './features/gym/WorkoutLoggerScreen';
 import { LogScreen } from './features/log/LogScreen';
 import { OnboardingScreen } from './features/onboarding/OnboardingScreen';
 import { PenaltyScreen } from './features/penalty/PenaltyScreen';
@@ -61,6 +64,10 @@ export function App() {
                   <Route path="quests/new" element={<QuestFormScreen mode="create" />} />
                   <Route path="quests/:questId/edit" element={<QuestFormScreen mode="edit" />} />
                   <Route path="log" element={<LogScreen />} />
+                  <Route path="log/workout" element={<WorkoutLoggerScreen />} />
+                  <Route path="exercises/:exerciseId" element={<ExerciseHistoryScreen />} />
+                  <Route path="bosses/new" element={<BossFormScreen mode="create" />} />
+                  <Route path="bosses/:bossId/edit" element={<BossFormScreen mode="edit" />} />
                   <Route path="settings" element={<SettingsScreen />} />
                   <Route path="settings/safe-zones" element={<SafeZonesScreen />} />
                 </Route>

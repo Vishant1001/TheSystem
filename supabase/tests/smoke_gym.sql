@@ -450,14 +450,16 @@ begin
   if (select count(*) from public.workout_sets where user_id = v_user) <> v_sets_before
      or (select count(*) from public.workout_sets where exercise_id = v_target and user_id = v_user) <> 4
      or exists (select 1 from public.workout_sets where exercise_id = v_custom)
-     or (select count(*) from public.workout_sets where exercise_id = v_target and exercise_name = 'Squat') <> 2 then
+     or (select count(*) from public.workout_sets
+         where exercise_id = v_target and user_id = v_user and exercise_name = 'Squat') <> 2 then
     raise exception 'G6: the merge must move every set and keep exercise_name';
   end if;
   -- Combined baselines: 120 x 5 beats the library history on both kinds.
   if public.pr_best(v_user, v_target, 'e1rm') <> 14000 or public.pr_best(v_user, v_target, 'max_weight') <> 12000
      or exists (select 1 from public.personal_records where exercise_id = v_custom and reversed_at is null)
      or exists (select 1 from public.personal_records
-                where exercise_id = v_target and reversed_at is null and xp_event_id is not null) then
+                where exercise_id = v_target and user_id = v_user
+                  and reversed_at is null and xp_event_id is not null) then
     raise exception 'G6: the target must carry the combined best as unpaid baselines';
   end if;
   -- No XP.
@@ -552,6 +554,48 @@ begin
     'EXERCISE_NOT_FOUND');
 
   raise notice 'G7. payloads: Phase 1 shape links by name, cardio measures, bad sets and foreign exercises refused';
+end;
+$$;
+
+-- ===========================================================================
+-- G8. Logger support (2.7): the rest timer setting stays inside the config
+--     bounds; exercise_summaries() counts the caller's sets per exercise.
+-- ===========================================================================
+do $$
+declare
+  v_user uuid := 'b0000000-0000-0000-0000-000000000008';
+  v_timer jsonb := public.game_config_value('gym') -> 'restTimer';
+  v_result jsonb;
+  v_summary jsonb;
+begin
+  perform pg_temp.act_as(v_user);
+
+  v_result := public.set_rest_timer(null);
+  if (v_result ->> 'rest_timer_s')::integer <> (v_timer ->> 'defaultSeconds')::integer
+     or not (v_result ->> 'is_default')::boolean then
+    raise exception 'G8: null resets the rest timer to the config default: %', v_result;
+  end if;
+  v_result := public.set_rest_timer((v_timer ->> 'maxSeconds')::integer);
+  if (select rest_timer_s from public.hunters where user_id = v_user) <> (v_timer ->> 'maxSeconds')::integer then
+    raise exception 'G8: the maximum is accepted';
+  end if;
+  perform pg_temp.expect_error(
+    format('select public.set_rest_timer(%s)', (v_timer ->> 'maxSeconds')::integer + 1), 'INVALID_REST_TIMER');
+  perform pg_temp.expect_error(
+    format('select public.set_rest_timer(%s)', (v_timer ->> 'minSeconds')::integer - 1), 'INVALID_REST_TIMER');
+
+  -- G7 logged 3 sets on Barbell Squat for this hunter (1 by name + ...).
+  select e into v_summary from jsonb_array_elements(public.exercise_summaries()) e
+  where (e ->> 'exercise_id')::uuid = pg_temp.lib('Barbell Squat');
+  if v_summary is null
+     or (v_summary ->> 'set_count')::integer <> (
+       select count(*) from public.workout_sets
+       where user_id = v_user and exercise_id = pg_temp.lib('Barbell Squat'))
+     or (v_summary ->> 'last_on')::date <> public.game_today() then
+    raise exception 'G8: exercise_summaries() must count the caller''s sets: %', v_summary;
+  end if;
+
+  raise notice 'G8. logger support: rest timer bounded by config, per-exercise set counts';
   raise notice '-------------------------------';
   raise notice 'GYM PASSED';
   raise notice '-------------------------------';

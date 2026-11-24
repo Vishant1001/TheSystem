@@ -51,6 +51,38 @@ export function penaltyCountdown(
   };
 }
 
+export interface DraftFinishNotice {
+  /** The game day a workout finished at `now` is logged on. */
+  gameDate: string;
+  /** The draft began on an earlier game day; it will count for today. */
+  startedOnEarlierDay: boolean;
+  /** Inside the last minutes before the rollover (config logger). */
+  finishSoon: boolean;
+}
+
+/**
+ * Step 2.7 review: an unfinished workout draft. log_workout logs on the game
+ * day of the moment you finish, so near the rollover the logger says
+ * "finish before 03:00", and a draft carried over from an earlier game day
+ * says it will count for today. ADR-2: both instants are passed in.
+ */
+export function draftFinishNotice(
+  now: Date,
+  startedAt: Date,
+  timeZone: string,
+  config: GameConfig = GAME_CONFIG,
+): DraftFinishNotice {
+  const startHour = config.dayRollover.startHour;
+  const gameDate = gameDateAt(now, timeZone, startHour);
+  const dayEndsAt = wallTimeToInstant(addDays(gameDate, 1), startHour, timeZone);
+  const warnFromMs = dayEndsAt.getTime() - config.logger.finishWarningMinutes * 60_000;
+  return {
+    gameDate,
+    startedOnEarlierDay: gameDateAt(startedAt, timeZone, startHour) < gameDate,
+    finishSoon: now.getTime() >= warnFromMs && now.getTime() < dayEndsAt.getTime(),
+  };
+}
+
 /** `HH:MM:SS`, rounding up so the display reaches 00:00:00 only at the end. */
 export function formatCountdown(ms: number): string {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));

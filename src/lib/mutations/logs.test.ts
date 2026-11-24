@@ -50,12 +50,26 @@ describe('log_workout payload since Step 2.6', () => {
       set_count: 3,
       auto_workout: { evaluated: true, action: 'unchanged' },
       counted_sets: 3,
-      workout_award: { xp: 6, source: 'workout', capped: false },
+      // The apply_award reply exactly as SQL builds it (extra keys are dropped).
+      workout_award: {
+        event_id: '00000000-0000-0000-0000-00000000000f',
+        source: 'workout',
+        xp: 6,
+        full_xp: 6,
+        capped: false,
+        stat_xp: { STR: 3, AGI: 0, VIT: 0, INT: 0, SENSE: 0 },
+        weakened: false,
+        free_points: 0,
+        debt_repayment: 0,
+        repayment_event_id: null,
+        debt_cleared: false,
+      },
       records: [],
       pr_bonuses: [],
       bosses_defeated: [],
     });
     expect(parsed.set_count).toBe(3);
+    expect(parsed.workout_award?.xp).toBe(6);
     expect(awardFromOutcome(parsed.auto_workout)).toBeNull();
   });
 });
