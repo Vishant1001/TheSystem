@@ -102,18 +102,28 @@ function History({ exercise }: { exercise: Exercise }) {
           </div>
         )}
 
-        {strength && (
+        {strength && records.isError && (
+          <div className="mt-3">
+            <SystemErrorPanel
+              message={systemMessage(records.error, systemCopy.errors.load)}
+              onRetry={() => {
+                void records.refetch();
+              }}
+            />
+          </div>
+        )}
+        {strength && !records.isError && (
           <dl className="mt-3 grid grid-cols-2 gap-2">
             <div className="border border-system/20 px-3 py-2">
               <dt className="text-xs text-steel">{copy.bestE1rm}</dt>
               <dd className="font-display text-lg text-system-glow" data-readout>
-                {bestLabel(records.data?.e1rm)}
+                {records.isPending ? copy.loadingValue : bestLabel(records.data.e1rm)}
               </dd>
             </div>
             <div className="border border-system/20 px-3 py-2">
               <dt className="text-xs text-steel">{copy.bestWeight}</dt>
               <dd className="font-display text-lg text-system-glow" data-readout>
-                {bestLabel(records.data?.maxWeight)}
+                {records.isPending ? copy.loadingValue : bestLabel(records.data.maxWeight)}
               </dd>
             </div>
           </dl>
@@ -154,15 +164,27 @@ function History({ exercise }: { exercise: Exercise }) {
       {canMerge && (
         <SystemWindow title={copy.mergeTitle}>
           <p className="mb-3 text-sm text-steel">{copy.mergeHint}</p>
-          <SystemButton
-            tone="ghost"
-            className="w-full"
-            onClick={() => {
-              setPicking(true);
-            }}
-          >
-            {copy.merge}
-          </SystemButton>
+          {summaries.isError ? (
+            // The confirmation must state how many sets move; without the
+            // count there is no merge.
+            <SystemErrorPanel
+              message={systemMessage(summaries.error, systemCopy.errors.load)}
+              onRetry={() => {
+                void summaries.refetch();
+              }}
+            />
+          ) : (
+            <SystemButton
+              tone="ghost"
+              className="w-full"
+              disabled={summaries.isPending}
+              onClick={() => {
+                setPicking(true);
+              }}
+            >
+              {summaries.isPending ? systemCopy.states.loading : copy.merge}
+            </SystemButton>
+          )}
           {error !== null && (
             <p role="alert" className="pt-2 text-sm text-penalty-text">
               {error}

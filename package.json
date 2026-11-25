@@ -23,6 +23,7 @@
     "gen:sql": "node scripts/gen-sql-artifacts.mjs",
     "db:sql": "node scripts/local-sql.mjs",
     "db:verify": "node scripts/local-sql.mjs supabase/tests/game_date_parity.sql supabase/tests/quest_schedule_parity.sql supabase/tests/safe_zone_parity.sql supabase/tests/penalty_parity.sql supabase/tests/gym_parity.sql supabase/tests/rls_proof.sql supabase/tests/smoke_game_rules.sql supabase/tests/smoke_safe_zones.sql supabase/tests/smoke_penalty_zone.sql supabase/tests/smoke_gym.sql",
+    "db:verify:clock": "node scripts/verify-clock.mjs",
     "sim:days": "node scripts/local-sql.mjs supabase/dev/simulate_days.sql"
   },
   "dependencies": {

@@ -131,6 +131,13 @@ throwaway `auth.users` rows, so run them against a local or test database.
 They are plain SQL, so each can also be pasted whole into the dashboard SQL
 editor of a test project.
 
+The RLS proof and smoke suites take their test hunters' time zone from
+`pg_temp.test_tz()`: Europe/Berlin (with DST) by default, or `Etc/GMT-N` when
+run with `--set test.utc_offset=N`. `npm run db:verify:clock`
+(`scripts/verify-clock.mjs`) uses that to run them at all 24 local hours.
+Every assertion is scoped to its own test hunters, so the suites also pass on
+a database full of other data.
+
 ## Security model (ADR-3, C1)
 
 - The client may **read** its own rows and **write only its own quests**.

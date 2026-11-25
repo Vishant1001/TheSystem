@@ -34,9 +34,14 @@ for (let index = 0; index < args.length; index += 1) {
     const [key, ...rest] = pair.split('=');
     const value = rest.join('=');
     // Settings are interpolated into a psql -c, so they are held to a strict
-    // shape: sim.* keys, and integer or integer-array values only.
-    if (!/^sim\.[a-z_]+$/.test(key)) fail(`refusing setting key "${key}" (only sim.*)`);
-    if (!/^[0-9{},\s]*$/.test(value)) fail(`refusing setting value "${value}" (integers only)`);
+    // shape: sim.* keys with integer or integer-array values, and the one test
+    // key test.utc_offset with a signed integer (scripts/verify-clock.mjs).
+    if (key === 'test.utc_offset') {
+      if (!/^-?[0-9]{1,2}$/.test(value)) fail(`refusing setting value "${value}" (signed integer)`);
+    } else {
+      if (!/^sim\.[a-z_]+$/.test(key)) fail(`refusing setting key "${key}" (only sim.*)`);
+      if (!/^[0-9{},\s]*$/.test(value)) fail(`refusing setting value "${value}" (integers only)`);
+    }
     settings.push([key, value]);
   } else {
     files.push(arg);

@@ -8,7 +8,7 @@ quests, XP, levels and stats.
 3. [Verifying](#3-verifying)
 4. [Going live](#4-going-live) — hosted Supabase, the read-only check, Vercel
 5. [Install on your phone](#5-install-on-your-phone)
-6. [10-minute manual test](#6-10-minute-manual-test-hosted-on-your-phone)
+6. [Manual test on your phone](#6-manual-test-on-your-phone-hosted-phase-1--2)
 7. [Conventions](#7-conventions)
 8. [Project layout](#8-project-layout)
 9. [Troubleshooting](#9-troubleshooting)
@@ -117,21 +117,22 @@ gym history, including a custom "Squat" to try **Merge into…** on.
 
 ## 2. Scripts
 
-| Script                | What it does                                                  |
-| --------------------- | ------------------------------------------------------------- |
-| `npm run dev`         | Vite dev server on http://localhost:5173                      |
-| `npm run dev:lan`     | The same, reachable from your phone on home WiFi (see 1.1)    |
-| `npm run build`       | Type-check both TS projects, then build to `dist/`            |
-| `npm run preview`     | Serve the built app with its service worker on port 4173      |
-| `npm run typecheck`   | `tsc` over `src/` and over the build config files             |
-| `npm run lint`        | ESLint, type-aware on `src/`                                  |
-| `npm run format`      | Prettier write (`format:check` to verify only)                |
-| `npm test`            | Vitest: engine, parity, schemas, Vercel config                |
-| `npm run gen:sql`     | Regenerate the SQL generated from `src/game/*.json`           |
-| `npm run db:verify`   | Run all four SQL test scripts against the **local** stack     |
-| `npm run db:sql -- f` | Run one SQL file against the local stack                      |
-| `npm run sim:days`    | Dev only: wind your local hunter back to create days to close |
-| `npm run icons`       | Regenerate PWA icons from `public/logo.svg`                   |
+| Script                    | What it does                                                      |
+| ------------------------- | ----------------------------------------------------------------- |
+| `npm run dev`             | Vite dev server on http://localhost:5173                          |
+| `npm run dev:lan`         | The same, reachable from your phone on home WiFi (see 1.1)        |
+| `npm run build`           | Type-check both TS projects, then build to `dist/`                |
+| `npm run preview`         | Serve the built app with its service worker on port 4173          |
+| `npm run typecheck`       | `tsc` over `src/` and over the build config files                 |
+| `npm run lint`            | ESLint, type-aware on `src/`                                      |
+| `npm run format`          | Prettier write (`format:check` to verify only)                    |
+| `npm test`                | Vitest: engine, parity, schemas, Vercel config                    |
+| `npm run gen:sql`         | Regenerate the SQL generated from `src/game/*.json`               |
+| `npm run db:verify`       | Every SQL parity, RLS and smoke suite against the **local** stack |
+| `npm run db:verify:clock` | The RLS proof and smoke suites at all 24 local hours of the day   |
+| `npm run db:sql -- f`     | Run one SQL file against the local stack                          |
+| `npm run sim:days`        | Dev only: wind your local hunter back to create days to close     |
+| `npm run icons`           | Regenerate PWA icons from `public/logo.svg`                       |
 
 The `db:*` and `sim:*` scripts pipe SQL into the local stack's own database container. They
 have no connection URL, so they cannot reach the hosted project.
@@ -146,9 +147,18 @@ npm run typecheck; npm run lint; npm test; npm run format:check; npm run build
 npm run db:verify
 ```
 
-`db:verify` runs the date and scheduling parity suites, the RLS proof (hunter A cannot read or
-write hunter B) and the end-to-end game-rules smoke test. Each runs in a transaction and rolls
-back. Details are in [supabase/README.md](supabase/README.md).
+`db:verify` runs every parity suite (engine vs SQL), the RLS proof (hunter A cannot read or
+write hunter B, and the exact list of RPCs a client may call) and the four smoke suites. Each
+runs in a transaction and rolls back. Details are in [supabase/README.md](supabase/README.md).
+
+The SQL suites read the real clock, and the rules care about the hunter's local time of day.
+`db:verify:clock` reruns the RLS proof and smoke suites with the test hunters in each of the 24
+whole-hour UTC offsets, so every local hour (warning windows, 00:00-03:00 before the rollover)
+is exercised wherever and whenever you run it:
+
+```powershell
+npm run db:verify:clock
+```
 
 To see the day close and System Report without waiting for midnight:
 
@@ -290,56 +300,98 @@ Open it from the home-screen icon. It runs full-screen with no browser bar. Sign
 installed app — on iOS it keeps its own storage, separate from Safari. New deploys install
 themselves; if the app looks stale, close it fully and reopen once.
 
-## 6. 10-minute manual test (hosted, on your phone)
+## 6. Manual test on your phone (hosted, Phase 1 + 2)
 
-Use a fresh account. Tick each line; the expected result follows the arrow.
+Use a **fresh test account** for this: a new account plays by Phase 2 rules from its first day,
+while your real account switches to them the game day after the push (G-a). Tick each line;
+the expected result follows the arrow. Day 1 takes about 10 minutes; days 2–4 are a minute or
+two each.
+
+### Day 1 (about 10 minutes)
 
 **0:00 – Install and sign up**
 
 - [ ] Open the installed app → full-screen, dark, _THE SYSTEM_ header, _Hunter Access_.
 - [ ] Sign up → straight to _Hunter Registration_, no email step.
 - [ ] Register with the defaults and your timezone → **Status**: Level 1, Rank E, all five
-      stats 10, _No points to allocate_, `0 / 60 XP`.
-- [ ] **Quests** → four core quests: Train, Calories in range, Hit protein, Study.
+      stats 10, `0 / 60 XP`, Streak 0, Stones 0.
+- [ ] **Quests** → four core quests (Train, Calories in range, Hit protein, Study), an empty
+      _Boss Gates 0/5_ section.
 
-**0:03 – Quests**
+**0:02 – Quests and food**
 
-- [ ] Study: enter `30` → Complete → toast `+35 XP · INT +17`. Status shows `35 / 60 XP`,
-      INT `17 / 30`.
-- [ ] Undo it → Status back to `0 / 60`. Complete it again.
+- [ ] Study: enter `30` → Complete → toast `+35 XP · INT +17`. Undo it → back to `0 / 60`.
+      Complete it again.
+- [ ] Log → Food: `900` kcal / `70` g, then `900` kcal / `60` g → toast `+20 XP` (Hit
+      protein). Calories in range reads _In range - locks at day end_ and stays open.
 
-**0:04 – Logging and auto quests**
+**0:04 – Workout logger**
 
-- [ ] Log → Food: `900` kcal, `70` g protein → no quest toast; Calories reads _Below range_.
-- [ ] Add `900` kcal, `60` g → toast `+20 XP · STR +5 · VIT +5` (Hit protein).
-- [ ] Quests → Calories in range shows `1800 kcal · In range - locks at day end` and is
-      **not** complete — it is judged at day close. Do not log more food today.
-- [ ] Log → Workout: a title and one set → toast `+35 XP · STR +9 · VIT +8` (Train), and
-      the **LEVEL UP** modal: `1 → 2`, `+3 free points`.
-- [ ] Delete the workout → `[Quest withdrawn]`. Levels come from the ledger, so you drop
-      back to level 1. Log it again → the modal returns. Expected.
+- [ ] Log → Workout → **Start workout** → _+ Add exercise_ → search `barbell squat` → pick
+      _Barbell Squat_ → "First time: this session sets your baseline."
+- [ ] Reps `5`, kg `60` → **Log set** → the **rest timer** appears above the nav at `1:30`.
+      Tap `+15 s` → `1:45`.
+- [ ] Go to **Status** and back to Log → _Resume workout_ → the timer is still counting and the
+      set is still there. **Log set** again (one tap, same values).
+- [ ] **Finish workout** → toasts `[Quest complete] +35 XP` (Train), then
+      `[Workout recorded] +4 XP · STR +2`, then **LEVEL UP** `1 → 2`.
 
-**0:07 – Status and settings**
+**0:06 – Records and a boss**
 
-- [ ] Status: Level 2, `Free points: 3`. Tap **+** on a stat → confirm → the stat shows
-      `+1`, free points 2, and its XP bar does not move (allocated points never change the
-      growth cost).
-- [ ] Settings: change the protein target and save → _In force today_ still shows the old
-      target, with _waiting for the next game day_.
+- [ ] Quests → _+ Add boss_ → exercise _Barbell Squat_, `70` kg × `3`, difficulty `E` → Boss
+      Gates `1/5`, reward `+20 XP · +1 free point`.
+- [ ] Log → Start workout → Barbell Squat → "Last time: 2 × 5 @ 60 kg" with `5` / `60`
+      prefilled → change to `3` reps, `70` kg → Log set → Finish → toasts
+      `[NEW RECORD] Barbell Squat e1RM 77 kg · max 70 kg · +25 XP` and
+      `[BOSS DEFEATED] … · +20 XP · +1 free point`; the boss moves to _Trophies_.
+- [ ] Log → Workout → tap _Barbell Squat_ → history: Best e1RM `77 kg`, Heaviest `70 kg`, two
+      sessions and a sparkline.
 
-**0:09 – Offline**
+**0:08 – Merge**
 
-- [ ] Airplane mode on → close and reopen the app → the shell loads and shows _The System
-      is unreachable_. Airplane mode off → the data returns.
+- [ ] Start workout → _+ Add exercise_ → type `my squat` → _Create custom exercise_ (kind
+      Strength) → log one set → Finish.
+- [ ] Open _my squat_'s history → **Merge into…** → pick _Barbell Full Squat_ → the
+      confirmation says `1 set moves` → Merge → `[Exercises merged]`, you land on Barbell
+      Full Squat with that session. Status XP is unchanged by the merge.
 
-**Next day, after 03:00 your time — the Phase 1 definition of done**
+**0:09 – Settings**
 
-- [ ] Open the app → the **System Report** appears: yesterday `CLEARED`, `Core 4/4`,
-      `+1 free point` (the calorie quest settles at the close and pays +35).
-- [ ] Acknowledge → Status shows the extra free point → allocate it.
+- [ ] Settings → Rest timer `+15 s` → `1:45`, _Rest timer updated_. Back to `1:30`.
+- [ ] Settings → Safe Zones → penalty mode **Standard**, no rest days → note _applies from
+      tomorrow_. Leave Sick/Travel alone today.
+- [ ] Airplane mode on → reopen → _The System is unreachable_ with **Try again**. Airplane
+      mode off → data returns.
+
+### Day 2 (after 03:00) – a cleared day, then a missed one
+
+- [ ] Open the app → **System Report**: day 1 `CLEARED`, Core `4/4`, `+1 free point`,
+      Streak 1 → Acknowledge.
+- [ ] Do **nothing** today except open the app after 23:00 (21:00 in Lenient) → a red
+      **WARNING** window on Status and Quests: _Daily quest incomplete. Penalty Zone in
+      HH:MM:SS._
+- [ ] Optional: Start a workout and leave it unfinished → the warning and the Train row add
+      _Unfinished workout — finish it to complete Train_; after 02:30 the logger says _Finish
+      before 03:00 to count for today_. Discard it.
+
+### Day 3 (after 03:00) – the Penalty Zone
+
+- [ ] Report: day 2 `FAILED`, streak 0 → Acknowledge → the **Penalty Zone** screen: the
+      missed quests and three options, each with its concrete consequence (Survival Trial,
+      XP Debt `N XP`, Weakened `STAT gains no stat XP until …`). No navigation except Sign out.
+- [ ] Choose **XP Debt** → Status shows _Active penalty_ with the debt remaining. Complete
+      Study → toast adds `N XP went to your XP Debt`; the remaining debt drops by that amount.
+- [ ] Settings → Safe Zones → **Sick**, 1 day → before your warning time it starts today
+      (after it, tomorrow); the quota shows the day used out of 10. Quests shows the _Safe
+      day_ banner and no warning window tonight.
+
+### Day 4 (after 03:00)
+
+- [ ] Report: day 3 `SAFE`, no penalty created, streak unchanged → Acknowledge.
 
 The day close only runs on a real new day on the hosted project: the dev simulator refuses to
-run anywhere but your local stack, by design.
+run anywhere but your local stack, by design. The same flows can be rehearsed locally in
+minutes with `npm run sim:days` (see the options at the top of `supabase/dev/simulate_days.sql`).
 
 ## 7. Conventions
 

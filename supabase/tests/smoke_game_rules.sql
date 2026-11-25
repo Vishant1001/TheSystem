@@ -12,6 +12,20 @@
 
 begin;
 
+-- The test hunters' time zone. Europe/Berlin (with its DST) by default;
+-- scripts/verify-clock.mjs reruns this file once per whole-hour UTC offset
+-- (--set test.utc_offset=N -> Etc/GMT-N), so every local hour of the day -
+-- the warning windows, 00:00-03:00 before the rollover - gets exercised.
+create function pg_temp.test_tz() returns text language sql stable as $tz$
+  select case
+    when nullif(current_setting('test.utc_offset', true), '') is null then 'Europe/Berlin'
+    when current_setting('test.utc_offset')::integer = 0 then 'Etc/GMT'
+    when current_setting('test.utc_offset')::integer > 0
+      then 'Etc/GMT-' || current_setting('test.utc_offset')
+    else 'Etc/GMT+' || abs(current_setting('test.utc_offset')::integer)::text
+  end;
+$tz$;
+
 insert into auth.users (id, email)
 values ('33333333-3333-3333-3333-333333333333', 'smoke@test.local');
 
@@ -45,7 +59,7 @@ begin
   -- =========================================================================
   -- A. Onboarding (acceptance 1.4)
   -- =========================================================================
-  v_snapshot := public.onboard_hunter('Smoke Hunter', 'Europe/Berlin', 1700, 1900, 120);
+  v_snapshot := public.onboard_hunter('Smoke Hunter', pg_temp.test_tz(), 1700, 1900, 120);
   v_today := public.game_today();
 
   select count(*) into v_count from public.quests where user_id = v_user;
@@ -486,7 +500,7 @@ begin
     end if;
   end;
 
-  perform public.update_hunter_profile('Smoke Hunter', 'Europe/Berlin', 1700, 1900, 120);
+  perform public.update_hunter_profile('Smoke Hunter', pg_temp.test_tz(), 1700, 1900, 120);
 
   raise notice 'J. timezone: immediate, clamped out of sealed days, validated';
 

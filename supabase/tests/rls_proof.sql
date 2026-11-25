@@ -14,6 +14,20 @@
 
 begin;
 
+-- The test hunters' time zone. Europe/Berlin (with its DST) by default;
+-- scripts/verify-clock.mjs reruns this file once per whole-hour UTC offset
+-- (--set test.utc_offset=N -> Etc/GMT-N), so every local hour of the day -
+-- the warning windows, 00:00-03:00 before the rollover - gets exercised.
+create function pg_temp.test_tz() returns text language sql stable as $tz$
+  select case
+    when nullif(current_setting('test.utc_offset', true), '') is null then 'Europe/Berlin'
+    when current_setting('test.utc_offset')::integer = 0 then 'Etc/GMT'
+    when current_setting('test.utc_offset')::integer > 0
+      then 'Etc/GMT-' || current_setting('test.utc_offset')
+    else 'Etc/GMT+' || abs(current_setting('test.utc_offset')::integer)::text
+  end;
+$tz$;
+
 insert into auth.users (id, email)
 values
   ('11111111-1111-1111-1111-111111111111', 'hunter-a@test.local'),
@@ -28,7 +42,7 @@ select set_config(
   true
 );
 set local role authenticated;
-select public.onboard_hunter('Hunter A', 'Europe/Berlin', 1700, 1900, 120);
+select public.onboard_hunter('Hunter A', pg_temp.test_tz(), 1700, 1900, 120);
 
 reset role;
 select set_config(
@@ -37,7 +51,7 @@ select set_config(
   true
 );
 set local role authenticated;
-select public.onboard_hunter('Hunter B', 'Europe/Berlin', 2200, 2400, 160);
+select public.onboard_hunter('Hunter B', pg_temp.test_tz(), 2200, 2400, 160);
 
 -- Give B something in every table worth stealing.
 select public.log_food('B protein shake', 300, 60);

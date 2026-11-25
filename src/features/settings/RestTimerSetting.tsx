@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { SystemButton } from '../../components/SystemButton';
+import { SystemErrorPanel, SystemLoading } from '../../components/SystemStates';
 import { SystemWindow } from '../../components/SystemWindow';
 import { useToast } from '../../components/toastContext';
 import { systemCopy } from '../../copy/system';
@@ -18,7 +19,23 @@ export function RestTimerSetting() {
   const toast = useToast();
   const [error, setError] = useState<string | null>(null);
 
-  if (setting.data === undefined) return null;
+  if (setting.isPending) {
+    return (
+      <SystemWindow title={copy.restSetting.toUpperCase()}>
+        <SystemLoading />
+      </SystemWindow>
+    );
+  }
+  if (setting.isError) {
+    return (
+      <SystemErrorPanel
+        message={systemMessage(setting.error, systemCopy.errors.load)}
+        onRetry={() => {
+          void setting.refetch();
+        }}
+      />
+    );
+  }
   const seconds = setting.data;
 
   function change(steps: number) {

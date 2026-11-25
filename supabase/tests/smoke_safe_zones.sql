@@ -9,6 +9,20 @@
 
 begin;
 
+-- The test hunters' time zone. Europe/Berlin (with its DST) by default;
+-- scripts/verify-clock.mjs reruns this file once per whole-hour UTC offset
+-- (--set test.utc_offset=N -> Etc/GMT-N), so every local hour of the day -
+-- the warning windows, 00:00-03:00 before the rollover - gets exercised.
+create function pg_temp.test_tz() returns text language sql stable as $tz$
+  select case
+    when nullif(current_setting('test.utc_offset', true), '') is null then 'Europe/Berlin'
+    when current_setting('test.utc_offset')::integer = 0 then 'Etc/GMT'
+    when current_setting('test.utc_offset')::integer > 0
+      then 'Etc/GMT-' || current_setting('test.utc_offset')
+    else 'Etc/GMT+' || abs(current_setting('test.utc_offset')::integer)::text
+  end;
+$tz$;
+
 insert into auth.users (id, email)
 values
   ('44444444-4444-4444-4444-444444444444', 'safe-sim@test.local'),
@@ -55,7 +69,7 @@ begin
   perform set_config('request.jwt.claims',
     json_build_object('sub', v_user, 'role', 'authenticated')::text, true);
 
-  perform public.onboard_hunter('Safe Sim', 'Europe/Berlin', 1700, 1900, 120);
+  perform public.onboard_hunter('Safe Sim', pg_temp.test_tz(), 1700, 1900, 120);
   v_today := public.game_today();
   v_base := v_today - 46;
   v_rest_dow := extract(isodow from v_base + 8)::smallint;
@@ -236,7 +250,7 @@ begin
   perform set_config('request.jwt.claims',
     json_build_object('sub', v_user, 'role', 'authenticated')::text, true);
 
-  perform public.onboard_hunter('Safe Rpc', 'Europe/Berlin', 1700, 1900, 120);
+  perform public.onboard_hunter('Safe Rpc', pg_temp.test_tz(), 1700, 1900, 120);
   v_today := public.game_today();
 
   -- ---- L --------------------------------------------------------------------
@@ -259,7 +273,7 @@ begin
   end if;
 
   -- A diet change on the same day keeps the new rules on that row.
-  perform public.update_hunter_profile('Safe Rpc', 'Europe/Berlin', 1800, 2000, 130);
+  perform public.update_hunter_profile('Safe Rpc', pg_temp.test_tz(), 1800, 2000, 130);
   select * into v_row from public.hunter_target_history
   where user_id = v_user and effective_on = v_today + 1;
   if v_row.penalty_mode <> 'lenient' or v_row.rest_days <> array[6, 7]::smallint[]
@@ -303,7 +317,7 @@ begin
   -- ---- M --------------------------------------------------------------------
   -- Start: today if before today's warning time (standard: 23:00), else
   -- tomorrow; never before rules_from (= today for a new hunter).
-  v_start := greatest(public.safe_period_start(now(), 'Europe/Berlin', 'standard'), v_today);
+  v_start := greatest(public.safe_period_start(now(), pg_temp.test_tz(), 'standard'), v_today);
   v_period := public.start_safe_period('sick', 3);
   if (v_period ->> 'start_on')::date <> v_start
      or (v_period ->> 'end_on')::date <> v_start + 2 then

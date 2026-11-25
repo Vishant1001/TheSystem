@@ -8,6 +8,20 @@
 
 begin;
 
+-- The test hunters' time zone. Europe/Berlin (with its DST) by default;
+-- scripts/verify-clock.mjs reruns this file once per whole-hour UTC offset
+-- (--set test.utc_offset=N -> Etc/GMT-N), so every local hour of the day -
+-- the warning windows, 00:00-03:00 before the rollover - gets exercised.
+create function pg_temp.test_tz() returns text language sql stable as $tz$
+  select case
+    when nullif(current_setting('test.utc_offset', true), '') is null then 'Europe/Berlin'
+    when current_setting('test.utc_offset')::integer = 0 then 'Etc/GMT'
+    when current_setting('test.utc_offset')::integer > 0
+      then 'Etc/GMT-' || current_setting('test.utc_offset')
+    else 'Etc/GMT+' || abs(current_setting('test.utc_offset')::integer)::text
+  end;
+$tz$;
+
 -- ---------------------------------------------------------------------------
 -- Test helpers (session-temporary, gone with the transaction).
 -- ---------------------------------------------------------------------------
@@ -26,7 +40,7 @@ declare
 begin
   insert into auth.users (id, email) values (p_user, lower(p_name) || '@test.local');
   perform pg_temp.act_as(p_user);
-  perform public.onboard_hunter(p_name, 'Europe/Berlin', 1700, 1900, 120);
+  perform public.onboard_hunter(p_name, pg_temp.test_tz(), 1700, 1900, 120);
   v_today := public.game_today();
   update public.quests set is_core = (title = any (p_core)) where user_id = p_user;
   execute 'alter table public.quests disable trigger quests_guard_immutable';

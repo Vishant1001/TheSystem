@@ -257,6 +257,7 @@ export const systemCopy = {
     bestE1rm: 'Best e1RM',
     bestWeight: 'Heaviest',
     noRecord: '-',
+    loadingValue: '…',
     trend: 'Best e1RM per session',
     sessions: 'Sessions',
     noSessions: 'No sessions logged yet.',
